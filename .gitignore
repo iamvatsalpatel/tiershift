@@ -1,0 +1,17 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# deps and build
+node_modules/
+dist/
+.venv/
+__pycache__/
+
+# os
+.DS_Store
+
+# runtime
+*.log
+decisions.jsonl
