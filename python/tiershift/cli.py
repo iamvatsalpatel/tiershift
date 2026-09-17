@@ -120,6 +120,14 @@ def cmd_report(args: argparse.Namespace) -> int:
     flags = [f for f in (f"{r.low_confidence} low-confidence (<0.5)" if r.low_confidence else "", f"{r.degraded} degraded" if r.degraded else "", f"{r.fell_back} fell back" if r.fell_back else "") if f]
     if flags:
         print("flags: " + ", ".join(flags))
+    checks = [t for t in r.tiers if t.estimate_check]
+    if checks:
+        print("\nestimate vs actual (entries where a model was called):")
+        for t in checks:
+            c = t.estimate_check or {}
+            ratio = c["ratio"]
+            how = f"{(ratio - 1) * 100:.0f}% high" if ratio >= 1 else f"{(1 - ratio) * 100:.0f}% low"
+            print(f"  {t.tier:<10} n={int(c['n']):<5} estimated {_usd(c['est'])}  actual {_usd(c['actual'])}  (estimate is {how})")
     if r.overrides:
         print("\noverrides fired:")
         for o in r.overrides:

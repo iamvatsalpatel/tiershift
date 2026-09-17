@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any, Sequence, Union
 
-from .types import CodeSignals, Config, Signals
+from .types import KNOWN_SIGNALS, CodeSignals, Config, Signals
 
 Vars = dict[str, Union[float, int, str, bool, None]]
 
@@ -28,20 +28,74 @@ def _to_number(s: str) -> float | None:
         return None
 
 
-def _eval_atom(atom: str, vars: Vars) -> bool:
+@dataclass
+class ParsedAtom:
+    name: str
+    op: str | None
+    rhs: str | None
+
+
+def edit_distance(a: str, b: str) -> int:
+    """Levenshtein distance, for did-you-mean hints."""
+    dp = [[i] + [0] * len(b) for i in range(len(a) + 1)]
+    for j in range(1, len(b) + 1):
+        dp[0][j] = j
+    for i in range(1, len(a) + 1):
+        for j in range(1, len(b) + 1):
+            dp[i][j] = min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + (0 if a[i - 1] == b[j - 1] else 1))
+    return dp[len(a)][len(b)]
+
+
+def suggest(name: str, candidates: Sequence[str] = KNOWN_SIGNALS) -> str:
+    """' (did you mean "x"?)' when a known name is within edit distance 3, else ''."""
+    best: str | None = None
+    best_d = 4
+    for c in candidates:
+        d = edit_distance(name.lower(), c.lower())
+        if d < best_d:
+            best_d, best = d, c
+    return f' (did you mean "{best}"?)' if best else ""
+
+
+def parse_atom(atom: str) -> ParsedAtom:
+    """Parse one atom without evaluating it. Raises on syntax errors and unknown signal names."""
     bare = atom.strip()
+    if not bare:
+        raise ValueError("empty condition")
     if _BARE.match(bare):
-        if bare not in vars:
-            raise ValueError(f"Unknown variable in condition: {bare}")
-        return bool(vars[bare])
+        if bare not in KNOWN_SIGNALS:
+            raise ValueError(f'unknown signal "{bare}"{suggest(bare)}')
+        return ParsedAtom(bare, None, None)
     m = _COND.match(bare)
     if not m:
-        raise ValueError(f'Cannot parse condition: "{atom}"')
-    name, op, raw_rhs = m.group(1), m.group(2), m.group(3)
+        raise ValueError(f'cannot parse "{bare}" (expected: signal, or signal <op> value, with <op> one of > < >= <= == !=)')
+    name, op, rhs = m.group(1), m.group(2), m.group(3)
+    if name not in KNOWN_SIGNALS:
+        raise ValueError(f'unknown signal "{name}"{suggest(name)}')
+    return ParsedAtom(name, op, rhs)
+
+
+def split_condition(expr: str) -> list[list[str]]:
+    """Split a condition into its `or`-clauses of `and`-atoms."""
+    return [_AND.split(clause) for clause in _OR.split(expr)]
+
+
+def parse_condition(expr: Any) -> list[list[ParsedAtom]]:
+    """Parse a whole condition. Raises with the offending atom quoted."""
+    if not isinstance(expr, str) or not expr.strip():
+        raise ValueError("empty condition")
+    return [[parse_atom(a) for a in clause] for clause in split_condition(expr)]
+
+
+def _eval_atom(atom: str, vars: Vars) -> bool:
+    parsed = parse_atom(atom)
+    name, op, raw_rhs = parsed.name, parsed.op, parsed.rhs
     if name not in vars:
-        raise ValueError(f"Unknown variable in condition: {name}")
+        raise ValueError(f'unknown signal "{name}"')
     lhs = vars[name]
-    rhs_str = raw_rhs.strip('"')
+    if op is None:
+        return bool(lhs)
+    rhs_str = (raw_rhs or "").strip('"')
     rhs_num = _to_number(rhs_str)
     numeric = rhs_num is not None and isinstance(lhs, (int, float)) and not isinstance(lhs, bool)
     if numeric:
@@ -62,7 +116,7 @@ def _eval_atom(atom: str, vars: Vars) -> bool:
         return left == right
     if op == "!=":
         return left != right
-    raise ValueError(f"Unknown operator {op}")
+    raise ValueError(f"unknown operator {op}")
 
 
 def _js_string(v: Any) -> str:
@@ -76,7 +130,7 @@ def _js_string(v: Any) -> str:
 
 def eval_condition(expr: str, vars: Vars) -> bool:
     """Conditions support `and` / `or` with `and` binding tighter. No parentheses."""
-    return any(all(_eval_atom(atom, vars) for atom in _AND.split(clause)) for clause in _OR.split(expr))
+    return any(all(_eval_atom(atom, vars) for atom in clause) for clause in split_condition(expr))
 
 
 @dataclass
@@ -124,6 +178,11 @@ def apply_policy(config: Config, signals: Signals, code: CodeSignals) -> PolicyR
             if floor > ti:
                 ti = floor
                 reason.append(f'override "{ov["when"]}" → at_least {ov["at_least"]}')
+        if ov.get("at_most"):
+            ceiling = idx(ov["at_most"])
+            if ceiling < ti:
+                ti = ceiling
+                reason.append(f'override "{ov["when"]}" → at_most {ov["at_most"]}')
         if ov.get("up"):
             nxt = min(len(order) - 1, ti + int(ov["up"]))
             if nxt > ti:

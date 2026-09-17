@@ -37,6 +37,8 @@ class Signals:
     creative: float
     safety_sensitive: float
     trivial_ack: float
+    mid_tier_ok: float
+    """Probability that a competent mid-tier model would answer well without expert-level reasoning."""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -44,6 +46,21 @@ class Signals:
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Signals":
         return cls(**{k: d[k] for k in cls.__dataclass_fields__})
+
+
+# Every signal name a policy condition may reference. One source of truth for policy.py and config.py. Mirrors src/types.ts.
+KNOWN_SIGNALS: tuple[str, ...] = (
+    # Jev signals
+    "difficulty", "difficulty_confidence", "needs_reasoning", "stakes", "stakes_confidence", "domain", "domain_confidence",
+    "has_code", "ambiguous", "output_length", "creative", "safety_sensitive", "trivial_ack", "mid_tier_ok",
+    # code signals
+    "est_input_tokens", "has_tools", "tool_count", "step", "retries", "turn_count",
+    # policy state
+    "tier",
+)
+
+# Pinned Jev version. Routing decisions depend on the model, so upgrades are deliberate: set `jev.model` in the YAML.
+DEFAULT_JEV_MODEL = "jev-1.13.0"
 
 
 @dataclass
@@ -95,7 +112,11 @@ class Rule(TypedDict, total=False):
 class Override(TypedDict, total=False):
     when: str
     at_least: str
+    """Raise to this tier when the current tier is lower."""
+    at_most: str
+    """Lower to this tier when the current tier is higher. Mirror of `at_least`."""
     up: int
+    """Move up this many tiers, capped at the top."""
 
 
 class Config(TypedDict, total=False):

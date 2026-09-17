@@ -40,6 +40,7 @@ class FakeJev:
             "output_length": _Ans(score=o.get("output_length", 1.0), confidence=0.9),
             "creative": _Ans(noul=0.0), "safety_sensitive": _Ans(noul=o.get("safety_sensitive", 0.0)),
             "trivial_ack": _Ans(noul=o.get("trivial_ack", 0.0)),
+            "mid_tier_ok": _Ans(noul=o.get("mid_tier_ok", 0.0)),
         }
         usage = type("U", (), {"input_tokens": 900, "output_tokens": 40})()
         return type("R", (), {"answers": answers, "usage": usage})()
@@ -67,7 +68,7 @@ CFG = {
     "models": {
         "loc/small": {"price": {"input": 0, "output": 0}, "context": 4000, "caps": ["tools"]},
         "cloud/fast": {"price": {"input": 0.2, "output": 1.0}, "caps": ["tools"]},
-        "cloud/mid": {"price": {"input": 2.0, "output": 10.0}, "caps": []},
+        "cloud/mid": {"price": {"input": 2.0, "output": 10.0}, "caps": ["reasoning"]},
         "cloud/big": {"price": {"input": 10.0, "output": 50.0}, "caps": ["tools"]},
     },
     "rules": [{"when": "trivial_ack > 0.8", "tier": "local"}, {"when": "difficulty < 0.5", "tier": "fast"}, {"when": "difficulty < 1.3", "tier": "mid"}, {"default": "flagship"}],
@@ -206,3 +207,73 @@ def test_check_works_without_typesafe_key():
     assert r.available()["fast"] == ["cloud/fast"]
     with pytest.raises(RuntimeError, match="TYPESAFE_API_KEY is not set"):
         r.route(MSGS)
+
+
+def test_reasoning_floor_raises_max_tokens_and_says_so():
+    p = FakeProvider("cloud")
+    res = make(jev=FakeJev(difficulty=0.9), providers={"cloud": p, "loc": FakeProvider("loc")}).complete(MSGS, max_tokens=200)
+    assert res.model == "cloud/mid" and p.calls[0].max_tokens == 1024
+    assert "raised max_tokens to 1024 for reasoning model cloud/mid" in res.decision.reason
+    # configurable floor
+    p2 = FakeProvider("cloud")
+    res2 = make(jev=FakeJev(difficulty=0.9), providers={"cloud": p2, "loc": FakeProvider("loc")}, defaults={"min_output_tokens": 3000}).complete(MSGS, max_tokens=200)
+    assert p2.calls[0].max_tokens == 3000 and "raised max_tokens to 3000 for reasoning model cloud/mid" in res2.decision.reason
+    # already above the floor: untouched, no reason line
+    p3 = FakeProvider("cloud")
+    res3 = make(jev=FakeJev(difficulty=0.9), providers={"cloud": p3, "loc": FakeProvider("loc")}).complete(MSGS, max_tokens=5000)
+    assert p3.calls[0].max_tokens == 5000 and not any(r.startswith("raised max_tokens") for r in res3.decision.reason)
+
+
+def test_no_floor_for_non_reasoning_model():
+    p = FakeProvider("cloud")
+    res = make(jev=FakeJev(difficulty=0.2), providers={"cloud": p, "loc": FakeProvider("loc")}).complete(MSGS, max_tokens=200)
+    assert res.model == "cloud/fast" and p.calls[0].max_tokens == 200 and not any(r.startswith("raised") for r in res.decision.reason)
+
+
+def test_empty_answer_with_length_finish_is_a_failure_and_falls_back():
+    p = FakeProvider("cloud")
+    seen = []
+
+    def complete(req):
+        seen.append(req.model)
+        if req.model == "fast":
+            return CompletionResult(text="   ", tool_calls=[], finish_reason="length", input_tokens=10, output_tokens=200, served_model=req.model, latency_ms=5)
+        return CompletionResult(text="real answer", tool_calls=[], finish_reason="stop", input_tokens=10, output_tokens=20, served_model=req.model, latency_ms=5)
+    p.complete = complete  # type: ignore[method-assign]
+    res = make(jev=FakeJev(difficulty=0.2), providers={"cloud": p, "loc": FakeProvider("loc")}).complete(MSGS, max_tokens=200)
+    assert seen == ["fast", "mid"] and res.fell_back and res.text == "real answer"
+    assert res.attempts[0].ok is False and res.attempts[0].error.startswith("cloud: empty_answer:length") and "200 output tokens billed" in res.attempts[0].error
+
+
+def test_empty_answer_with_stop_finish_is_not_a_failure():
+    p = FakeProvider("cloud", text="")
+    res = make(jev=FakeJev(difficulty=0.2), providers={"cloud": p, "loc": FakeProvider("loc")}).complete(MSGS)
+    assert res.text == "" and not res.fell_back and len(p.calls) == 1
+
+
+def test_api_keys_are_redacted_from_attempt_errors_and_thrown_message():
+    secret = "sk-live-ABCDEFGH12345678"
+    p = FakeProvider("cloud")
+
+    def complete(req):
+        raise ProviderError("cloud", 500, f"upstream echoed Authorization: Bearer {secret} and TS key ts_SECRETKEY_0001")
+    p.complete = complete  # type: ignore[method-assign]
+    router = Router(config=CFG, env={"CLOUD_KEY": secret, "TYPESAFE_API_KEY": "ts_SECRETKEY_0001"}, jev_client=FakeJev(difficulty=0.2), providers={"cloud": p, "loc": FakeProvider("loc")}, log=False)
+    with pytest.raises(RuntimeError) as ei:
+        router.complete(MSGS)
+    msg = str(ei.value)
+    assert secret not in msg and "ts_SECRETKEY_0001" not in msg and msg.count("[redacted]") >= 2
+
+
+def test_redaction_applies_to_attempt_records_on_fallback_success():
+    secret = "sk-live-ABCDEFGH12345678"
+    p = FakeProvider("cloud")
+
+    def complete(req):
+        if req.model == "fast":
+            raise ProviderError("cloud", 503, f"bad gateway; header was {secret}")
+        return CompletionResult(text="ok", tool_calls=[], finish_reason="stop", input_tokens=1, output_tokens=1, served_model=req.model, latency_ms=1)
+    p.complete = complete  # type: ignore[method-assign]
+    router = Router(config=CFG, env={"CLOUD_KEY": secret}, jev_client=FakeJev(difficulty=0.2), providers={"cloud": p, "loc": FakeProvider("loc")}, log=False)
+    res = router.complete(MSGS)
+    assert res.fell_back and secret not in res.attempts[0].error and "[redacted]" in res.attempts[0].error

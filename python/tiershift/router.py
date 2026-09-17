@@ -13,7 +13,7 @@ from .log import DEFAULT_LOG, from_decision, log_entry
 from .policy import apply_policy, estimate_output_tokens
 from .providers import CompletionRequest, Provider, ProviderError, build_providers
 from .signals import ask_jev, build_state, code_signals
-from .types import Attempt, CompleteResult, Config, Decision, Message, ModelMeta, ToolDef
+from .types import DEFAULT_JEV_MODEL, Attempt, CompleteResult, Config, Decision, Message, ModelMeta, ToolDef
 
 Pick = tuple[str, Optional[float]]
 
@@ -54,7 +54,7 @@ class Router:
         self.env: Mapping[str, str] = os.environ if env is None else env
         self.config: Config = config if isinstance(config, dict) else load_config(config)  # type: ignore[arg-type]
         jev_cfg = self.config.get("jev") or {}
-        self._jev_model: Optional[str] = jev_cfg.get("model")
+        self._jev_model: str = jev_cfg.get("model") or DEFAULT_JEV_MODEL
         self._jev_timeout: Optional[float] = (jev_cfg["timeout_ms"] / 1000) if jev_cfg.get("timeout_ms") else None
         self._jev_override = jev_client
         self._typesafe_api_key = typesafe_api_key
@@ -68,6 +68,14 @@ class Router:
             self.log_path = log
         else:
             self.log_path = log_cfg.get("path") or DEFAULT_LOG
+        # Every secret this router knows about. Provider errors sometimes echo request headers; never let a key reach a log or an error.
+        keys = [typesafe_api_key, self.env.get("TYPESAFE_API_KEY")] + [self.env.get(p["api_key_env"]) for p in self.config["providers"].values() if p.get("api_key_env")]
+        self._secrets: list[str] = [k for k in keys if isinstance(k, str) and len(k) >= 8]
+
+    def _redact(self, text: str) -> str:
+        for s in self._secrets:
+            text = text.replace(s, "[redacted]")
+        return text
 
     @property
     def _jev(self) -> Any:
@@ -163,27 +171,34 @@ class Router:
         attempts: list[Attempt] = []
         defaults = cfg.get("defaults") or {}
         models = cfg.get("models") or {}
+        min_out = defaults.get("min_output_tokens", 1024)
         for mid in candidates:
             pname, model = split_model(mid)
             provider = self.providers.get(pname)
             t0 = time.perf_counter()
             if provider is None:
-                attempts.append(Attempt(model=mid, ok=False, latency_ms=0, error=f'provider "{pname}" has no key'))
+                attempts.append(Attempt(model=mid, ok=False, latency_ms=0, error=f'provider "{pname}" has no key', status=None))
                 continue
+            # Reasoning models spend output tokens on thinking first. A small budget returns an empty answer at full price.
+            mt = max_tokens or defaults.get("max_tokens") or 4096
+            if "reasoning" in ((models.get(mid) or {}).get("caps") or []) and mt < min_out:
+                decision.reason.append(f"raised max_tokens to {min_out} for reasoning model {mid}")
+                mt = min_out
             try:
                 r = provider.complete(CompletionRequest(
-                    model=model, messages=messages, tools=tools,
-                    max_tokens=max_tokens or defaults.get("max_tokens") or 4096,
+                    model=model, messages=messages, tools=tools, max_tokens=mt,
                     temperature=temperature if temperature is not None else defaults.get("temperature"),
                     params=(models.get(mid) or {}).get("params"),
                 ))
+                if not r.text.strip() and not r.tool_calls and r.finish_reason == "length":
+                    raise ProviderError(pname, None, f"empty_answer:length (output budget {mt} consumed before any answer text; {r.output_tokens} output tokens billed)")
             except ProviderError as e:
-                attempts.append(Attempt(model=mid, ok=False, latency_ms=round((time.perf_counter() - t0) * 1000), error=str(e), status=e.status))
+                attempts.append(Attempt(model=mid, ok=False, latency_ms=round((time.perf_counter() - t0) * 1000), error=self._redact(str(e)), status=e.status))
                 if not e.retryable:
                     break
                 continue
             except Exception as e:  # network or unexpected: try the fallback
-                attempts.append(Attempt(model=mid, ok=False, latency_ms=round((time.perf_counter() - t0) * 1000), error=str(e)))
+                attempts.append(Attempt(model=mid, ok=False, latency_ms=round((time.perf_counter() - t0) * 1000), error=self._redact(str(e))))
                 continue
             attempts.append(Attempt(model=mid, ok=True, latency_ms=r.latency_ms))
             cost = _est_cost(models.get(mid), r.input_tokens, r.output_tokens)
@@ -195,7 +210,7 @@ class Router:
                 tool_calls=r.tool_calls, finish_reason=r.finish_reason, usage={"input_tokens": r.input_tokens, "output_tokens": r.output_tokens},
                 cost_usd=cost, latency_ms=r.latency_ms, raw=r.raw,
             )
-        raise RuntimeError("tiershift: every candidate failed. " + " | ".join(f"{a.model}: {a.error}" for a in attempts))
+        raise RuntimeError(self._redact("tiershift: every candidate failed. " + " | ".join(f"{a.model}: {a.error}" for a in attempts)))
 
 
 def create_router(config: Optional[Union[str, Config]] = None, env: Optional[Mapping[str, str]] = None, log: Union[str, bool, None] = None, **kwargs: Any) -> Router:

@@ -48,6 +48,8 @@ class TierStat:
     est_cost: float
     mean_confidence: float
     p50_jev_ms: float
+    estimate_check: Optional[dict[str, float]] = None
+    """Present when the tier has entries with actual usage: n, est, actual, ratio (est / actual)."""
 
 
 @dataclass
@@ -80,12 +82,19 @@ def build_report(entries: Sequence[Mapping[str, Any]], config: Config, tiers: Op
     tier_stats: list[TierStat] = []
     for tier in order:
         es = [e for e in entries if e.get("tier") == tier]
-        tier_stats.append(TierStat(
+        stat = TierStat(
             tier=tier, n=len(es), share=len(es) / (n or 1),
             cost=sum(entry_cost(e) for e in es), est_cost=sum(float(e.get("est_cost_usd") or 0) for e in es),
             mean_confidence=(sum(float(e["confidence"]) for e in es) / len(es)) if es else 0,
             p50_jev_ms=_pct([float(e["jev_latency_ms"]) for e in es], 0.5),
-        ))
+        )
+        # Where a model was actually called, compare the pre-call estimate with the billed cost so users can see the estimate error.
+        both = [e for e in es if e.get("cost_usd") is not None and e.get("est_cost_usd") is not None]
+        if both:
+            est = sum(float(e["est_cost_usd"]) for e in both)
+            actual = sum(float(e["cost_usd"]) for e in both)
+            stat.estimate_check = {"n": len(both), "est": est, "actual": actual, "ratio": (est / actual) if actual > 0 else 0}
+        tier_stats.append(stat)
     model_ids = sorted({e["model"] for e in entries})
     models = []
     for mid in model_ids:

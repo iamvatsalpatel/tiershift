@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from tiershift import CodeSignals, Signals, apply_policy, estimate_output_tokens, eval_condition
+from tiershift import KNOWN_SIGNALS, CodeSignals, Signals, apply_policy, edit_distance, estimate_output_tokens, eval_condition, parse_condition, suggest
 
-BASE = Signals(difficulty=0, difficulty_confidence=1, needs_reasoning=0, stakes=0, stakes_confidence=1, domain="general", domain_confidence=1, has_code=0, ambiguous=0, output_length=0, creative=0, safety_sensitive=0, trivial_ack=0)
+BASE = Signals(difficulty=0, difficulty_confidence=1, needs_reasoning=0, stakes=0, stakes_confidence=1, domain="general", domain_confidence=1, has_code=0, ambiguous=0, output_length=0, creative=0, safety_sensitive=0, trivial_ack=0, mid_tier_ok=0)
 CODE = CodeSignals(est_input_tokens=100, has_tools=False, tool_count=0, step=None, retries=0, turn_count=1)
 CFG = {
     "providers": {"x": {"type": "openai-compatible"}},
@@ -46,13 +46,37 @@ class TestEvalCondition:
         assert eval_condition("step == null", self.V)
         assert not eval_condition("step == plan", self.V)
 
-    def test_unknown_variable(self):
-        with pytest.raises(ValueError, match="Unknown variable"):
+    def test_unknown_signal_with_suggestion(self):
+        with pytest.raises(ValueError, match='unknown signal "difficlty" \\(did you mean "difficulty"\\?\\)'):
+            eval_condition("difficlty > 1", self.V)
+        with pytest.raises(ValueError, match='unknown signal "nope"'):
             eval_condition("nope > 1", self.V)
 
     def test_unparseable(self):
-        with pytest.raises(ValueError, match="Cannot parse"):
+        with pytest.raises(ValueError, match='cannot parse "difficulty <> 1"'):
             eval_condition("difficulty <> 1", self.V)
+
+
+class TestParse:
+    def test_parse_condition_shapes(self):
+        parsed = parse_condition("has_tools and tier == local or difficulty >= 0.5")
+        assert [[a.name for a in clause] for clause in parsed] == [["has_tools", "tier"], ["difficulty"]]
+        assert parsed[0][1].op == "==" and parsed[0][1].rhs == "local"
+
+    def test_every_known_signal_parses(self):
+        for name in KNOWN_SIGNALS:
+            parse_condition(f"{name} == 1")
+
+    def test_empty(self):
+        for bad in ("", "   ", None):
+            with pytest.raises(ValueError, match="empty condition"):
+                parse_condition(bad)
+
+    def test_edit_distance_and_suggest(self):
+        assert edit_distance("kitten", "sitting") == 3
+        assert suggest("difficlty") == ' (did you mean "difficulty"?)'
+        assert suggest("zzzzzzzzzz") == ""
+        assert suggest("fsat", ["local", "fast"]) == ' (did you mean "fast"?)'
 
 
 class TestApplyPolicy:
@@ -86,6 +110,13 @@ class TestApplyPolicy:
         bad = {**CFG, "rules": [{"default": "zzz"}]}
         with pytest.raises(ValueError, match='unknown tier "zzz"'):
             apply_policy(bad, BASE, CODE)
+
+    def test_at_most_lowers_but_never_raises(self):
+        cfg = {**CFG, "overrides": [{"when": "mid_tier_ok > 0.8 and stakes < 1.5", "at_most": "mid"}]}
+        r = apply_policy(cfg, sig(difficulty=1.9, mid_tier_ok=0.9), CODE)
+        assert r.tier == "mid" and r.reason[-1] == 'override "mid_tier_ok > 0.8 and stakes < 1.5" → at_most mid'
+        assert apply_policy(cfg, sig(difficulty=1.9, mid_tier_ok=0.9, stakes=1.8), CODE).tier == "flagship"
+        assert apply_policy(cfg, sig(difficulty=0.2, mid_tier_ok=0.9), CODE).tier == "fast"
 
     def test_reason_strings_match_typescript_format(self):
         r = apply_policy(CFG, sig(difficulty=0.3, difficulty_confidence=0.4), CODE)

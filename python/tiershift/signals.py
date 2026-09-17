@@ -65,6 +65,9 @@ QUESTIONS: dict[str, Any] = {
     "trivial_ack": Noul(
         instructions="Is `request.user_message` a trivial acknowledgement, confirmation, greeting, or pure formatting request that needs no thought?",
     ),
+    "mid_tier_ok": Noul(
+        instructions="Would a competent mid-tier model (strong but not frontier) answer `request.user_message` well without expert-level reasoning?",
+    ),
 }
 
 
@@ -132,6 +135,7 @@ def _to_signals(answers: dict[str, Any]) -> Signals:
         creative=a["creative"].noul,
         safety_sensitive=a["safety_sensitive"].noul,
         trivial_ack=a["trivial_ack"].noul,
+        mid_tier_ok=a["mid_tier_ok"].noul,
     )
 
 

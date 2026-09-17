@@ -7,7 +7,7 @@ import pytest
 
 from tiershift import CodeSignals, Decision, Signals, build_report, from_decision, log_entry, read_log, tune
 
-SIG = dict(difficulty=1.0, difficulty_confidence=0.8, needs_reasoning=0.5, stakes=0.2, stakes_confidence=0.9, domain="code", domain_confidence=0.9, has_code=0.9, ambiguous=0.1, output_length=1.0, creative=0.0, safety_sensitive=0.0, trivial_ack=0.0)
+SIG = dict(difficulty=1.0, difficulty_confidence=0.8, needs_reasoning=0.5, stakes=0.2, stakes_confidence=0.9, domain="code", domain_confidence=0.9, has_code=0.9, ambiguous=0.1, output_length=1.0, creative=0.0, safety_sensitive=0.0, trivial_ack=0.0, mid_tier_ok=0.3)
 CODE = dict(est_input_tokens=1000, has_tools=False, tool_count=0, step=None, retries=0, turn_count=1)
 CFG = {
     "providers": {"p": {"type": "openai-compatible"}},
@@ -61,6 +61,13 @@ def test_report_prefers_actual_cost_and_handles_empty():
     assert r.total_cost == pytest.approx(0.02)
     empty = build_report([], CFG)
     assert empty.n == 0 and empty.saving_vs_flagship is None
+
+
+def test_report_estimate_check_per_tier():
+    r = build_report([entry("mid", "p/m", 1.0, kind="complete", est_cost_usd=0.01, cost_usd=0.02), entry("mid", "p/m", 1.0, est_cost_usd=0.01)], CFG)
+    mid = next(t for t in r.tiers if t.tier == "mid")
+    assert mid.estimate_check == {"n": 1, "est": 0.01, "actual": 0.02, "ratio": 0.5}
+    assert next(t for t in r.tiers if t.tier == "fast").estimate_check is None
 
 
 def test_report_uses_supplied_available_tiers_for_baseline():
