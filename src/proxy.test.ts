@@ -1,5 +1,9 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { startProxy, type ProxyHandle } from "./proxy.js";
+import type { LogEntry } from "./log.js";
 import { ProviderError, type CompletionRequest, type CompletionResult, type Provider } from "./providers/types.js";
 import type { Config, Decision } from "./types.js";
 
@@ -37,8 +41,13 @@ function fakeProvider(name: string, text: string): Provider {
 }
 const anthropicLike: Provider = { name: "a", async complete(req) { calls.push({ provider: "a", req, stream: false }); return { text: "big", toolCalls: [], finishReason: "end_turn", usage: { inputTokens: 1, outputTokens: 1 }, servedModel: "big", latencyMs: 1, raw: {} }; } };
 
+const logDir = mkdtempSync(join(tmpdir(), "tiershift-proxy-"));
+const logPath = join(logDir, "decisions.jsonl");
+const readLogLines = (): LogEntry[] => (existsSync(logPath) ? readFileSync(logPath, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as LogEntry) : []);
+
 const router = {
   config,
+  logPath,
   providers: { p: fakeProvider("p", "small says hi"), q: fakeProvider("q", "medium says hi"), a: anthropicLike },
   available: () => ({ fast: ["p/small"], mid: ["q/medium"], flagship: ["a/big"] }),
   async route() { routeCalls++; return decision; },
@@ -46,7 +55,8 @@ const router = {
 
 let h: ProxyHandle;
 beforeAll(async () => { h = await startProxy({ router, port: 0 }); });
-afterAll(async () => { await h.close(); });
+afterAll(async () => { await h.close(); rmSync(logDir, { recursive: true, force: true }); });
+beforeEach(() => { rmSync(logPath, { force: true }); });
 const post = (body: unknown, raw = false) => fetch(`${h.url}/v1/chat/completions`, { method: "POST", headers: { "content-type": "application/json" }, body: raw ? (body as string) : JSON.stringify(body) });
 
 describe("proxy", () => {
@@ -130,5 +140,45 @@ describe("proxy", () => {
     expect(res.status).toBe(200);
     expect(calls[0].req.messages[1].content).toBe("part one\n[non-text content]");
     expect(calls[0].req.tools).toEqual([{ name: "f", description: "d", parameters: { type: "object", properties: {} } }]);
+  });
+
+  it("logs one complete entry with actual tokens and cost for a routed non-streaming request", async () => {
+    const res = await post({ model: "auto:billing", messages: [{ role: "user", content: "hi" }] });
+    expect(res.status).toBe(200);
+    const lines = readLogLines();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ kind: "complete", model: "p/small", tier: "fast", fell_back: false, input_tokens: 7, output_tokens: 3, model_latency_ms: 12, tag: "billing", jev_latency_ms: 150 });
+    // p/small has no price in the test config, so cost is null rather than a guess; the estimate from the decision is kept.
+    expect(lines[0].cost_usd).toBeNull(); expect(lines[0].est_cost_usd).toBe(0.00001);
+    expect(JSON.stringify(lines[0])).not.toContain("small says hi");
+  });
+  it("logs the fallback model with fell_back true when the first candidate fails", async () => {
+    failSmallWith = new ProviderError("p", 503, "down");
+    const res = await post({ model: "auto", messages: [{ role: "user", content: "x" }] });
+    failSmallWith = null;
+    expect(res.status).toBe(200);
+    const lines = readLogLines();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ kind: "complete", model: "q/medium", tier: "mid", fell_back: true });
+  });
+  it("logs one route-only entry for a routed streaming request", async () => {
+    const res = await post({ model: "auto", stream: true, messages: [{ role: "user", content: "x" }] });
+    expect(res.status).toBe(200); await res.text();
+    const lines = readLogLines();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ kind: "route", model: "p/small", tier: "fast", cost_usd: null, input_tokens: null, output_tokens: null });
+  });
+  it("logs a route-only entry when every candidate fails, so the decision is not lost", async () => {
+    failSmallWith = new ProviderError("p", 400, "bad param");
+    const res = await post({ model: "auto", messages: [{ role: "user", content: "x" }] });
+    failSmallWith = null;
+    expect(res.status).toBe(400);
+    const lines = readLogLines();
+    expect(lines).toHaveLength(1); expect(lines[0].kind).toBe("route");
+  });
+  it("writes nothing to the log for an explicit model id", async () => {
+    const res = await post({ model: "q/medium", messages: [{ role: "user", content: "x" }] });
+    expect(res.status).toBe(200);
+    expect(readLogLines()).toHaveLength(0);
   });
 });

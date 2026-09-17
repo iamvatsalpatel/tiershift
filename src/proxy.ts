@@ -12,9 +12,11 @@ import type { Router } from "./router.js";
 import type { Decision, Message, ToolDef } from "./types.js";
 import { ProviderError } from "./providers/types.js";
 import type { CompletionRequest, CompletionResult, Provider } from "./providers/types.js";
+import { fromDecision, logEntry } from "./log.js";
+import type { ModelMeta } from "./types.js";
 
 export interface ProxyOptions {
-  router: Pick<Router, "route" | "providers" | "config" | "available">;
+  router: Pick<Router, "route" | "providers" | "config" | "available" | "logPath">;
   host?: string;
   port?: number;
   /** Max request body in bytes. Default 8 MB. */
@@ -156,6 +158,18 @@ export function createProxy(opts: ProxyOptions): Server {
     return p;
   }
 
+  /** Same formula as router.complete(): actual usage times the per-model price from prices.yaml. */
+  function actualCost(meta: ModelMeta | undefined, usage: { inputTokens: number; outputTokens: number }): number | null {
+    if (!meta?.price) return null;
+    return (usage.inputTokens * meta.price.input + usage.outputTokens * meta.price.output) / 1_000_000;
+  }
+
+  /** Logging never breaks a response. Same rule as the router. */
+  function writeLog(entry: Parameters<typeof logEntry>[1]): void {
+    if (!router.logPath) return;
+    try { logEntry(router.logPath, entry); } catch { /* never let logging affect the response */ }
+  }
+
   function completionRequest(id: string, messages: Message[], tools: ToolDef[] | undefined, body: ChatBody): CompletionRequest {
     return {
       model: splitModel(id).model,
@@ -163,6 +177,8 @@ export function createProxy(opts: ProxyOptions): Server {
       tools,
       maxTokens: body.max_completion_tokens ?? body.max_tokens ?? router.config.defaults?.max_tokens ?? 4096,
       temperature: body.temperature ?? router.config.defaults?.temperature,
+      // Precedence: the operator's per-model YAML `params` win over the same fields sent by the client.
+      // The operator knows provider quirks the client does not, e.g. gpt-5.6-luna needs reasoning_effort none for tools.
       params: { ...passthroughParams(body), ...(router.config.models?.[id]?.params ?? {}) },
     };
   }
@@ -183,7 +199,8 @@ export function createProxy(opts: ProxyOptions): Server {
     let decision: Decision | null = null;
     let candidates: string[];
     if (target.mode === "auto") {
-      decision = await router.route({ messages, tools, tag: target.tag });
+      // Suppress the router's route-only entry: the proxy writes the log line itself once it knows the outcome.
+      decision = await router.route({ messages, tools, tag: target.tag, __noLog: true });
       candidates = [decision.model, decision.fallback].filter((m): m is string => Boolean(m));
     } else {
       candidates = [target.id];
@@ -192,6 +209,8 @@ export function createProxy(opts: ProxyOptions): Server {
     if (body.stream) {
       // Streaming: pipe the upstream SSE body through unchanged. Fallback applies only before the first byte
       // (a provider error on connect). Once bytes flow, a mid-stream failure ends the stream; the client sees a cut.
+      // Token usage is not available when piping SSE through, so the log gets a route-only entry with the estimate.
+      if (decision) writeLog(fromDecision(decision, { kind: "route", tag: target.mode === "auto" ? target.tag : undefined }));
       let lastErr: unknown = null;
       for (const id of candidates) {
         const provider = providerFor(id);
@@ -227,11 +246,14 @@ export function createProxy(opts: ProxyOptions): Server {
     }
 
     // Non-streaming: try the chosen model, then the fallback, same rule as router.complete().
+    const tag = target.mode === "auto" ? target.tag : undefined;
     let lastErr: unknown = null;
     for (const id of candidates) {
       const provider = providerFor(id);
       try {
         const r = await provider.complete(completionRequest(id, messages, tools, body), abort.signal);
+        // Mirror router.complete(): one "complete" entry with actual tokens, cost, and model latency.
+        if (decision) writeLog(fromDecision(decision, { kind: "complete", model: id, tier: tierOf(id), fell_back: id !== decision.model, cost_usd: actualCost(router.config.models?.[id], r.usage), input_tokens: r.usage.inputTokens, output_tokens: r.usage.outputTokens, model_latency_ms: r.latencyMs, tag }));
         sendJson(res, 200, toOpenAIResponse(r, id), {
           ...decisionHeaders(decision, id),
           ...(decision && id !== decision.model ? { "x-tiershift-fell-back": "true" } : {}),
@@ -242,9 +264,11 @@ export function createProxy(opts: ProxyOptions): Server {
       } catch (e) {
         lastErr = e;
         const pe = e instanceof ProviderError ? e : null;
-        if (pe && !pe.retryable) throw e;
+        if (pe && !pe.retryable) break;
       }
     }
+    // Every candidate failed (or a 4xx stopped the loop): keep the decision in the log as a route-only entry.
+    if (decision) writeLog(fromDecision(decision, { kind: "route", tag }));
     throw lastErr ?? new HttpError(502, "every candidate model failed", "server_error", "upstream_failed");
   }
 

@@ -7,6 +7,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 - `tiershift serve`: OpenAI-compatible chat-completions proxy on `node:http`. `model: "auto"` routes per request, explicit ids bypass routing, decisions are returned in `x-tiershift-*` headers, `stream: true` pipes provider SSE through for OpenAI-compatible providers, `GET /v1/models` lists `auto` plus configured models. Binds to 127.0.0.1 by default.
 - `Provider.streamRaw()` optional method, implemented by the OpenAI-compatible adapter.
+- Proxy decision-log parity with `router.complete()`: routed non-streaming requests write a `complete` entry with actual tokens, cost, and model latency; streaming requests write a route-only entry; explicit ids write nothing. Per-model YAML `params` take precedence over client-sent fields.
 - `mid_tier_ok` signal: Jev's direct judgment of whether a mid-tier model would answer well. Not used by the default rules; a commented `at_most` example shows how.
 - `at_most` override action, the mirror of `at_least`: lowers the tier to a ceiling.
 - Load-time policy validation. Unknown signals, tiers, or providers, unparsable conditions, a non-positive `up`, a `default` that is not last, and an override with no action all fail at `loadConfig()` with the location quoted and a did-you-mean hint.
