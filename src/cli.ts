@@ -6,6 +6,7 @@ import { syncModels } from "./sync-models.js";
 import { readLog, DEFAULT_LOG } from "./log.js";
 import { buildReport, tune } from "./analytics.js";
 import { loadConfig, availableTiers } from "./config.js";
+import { startProxy } from "./proxy.js";
 
 function loadDotenv() {
   try {
@@ -99,6 +100,21 @@ async function main() {
 
   const router = createRouter({ config: cfgPath, log: logPathArg });
 
+  if (cmd === "serve") {
+    const portIdx = args.indexOf("--port"); const port = portIdx >= 0 ? Number(args.splice(portIdx, 2)[1]) : 4141;
+    const hostIdx = args.indexOf("--host");
+    // Default to loopback: the proxy has no authentication, so it must not be reachable from other machines unless you put it behind your own auth.
+    const host = hostIdx >= 0 ? args.splice(hostIdx, 2)[1] : "127.0.0.1";
+    if (!Number.isInteger(port) || port < 0 || port > 65535) { console.error(`--port must be an integer 0-65535, got "${port}"`); process.exit(2); }
+    const h = await startProxy({ router, host, port });
+    const av = router.available();
+    const summary = Object.entries(router.config.tiers).map(([tier, models]) => `${tier}: ${av[tier].length}/${models.length}`).join("  ");
+    console.log(`tiershift proxy listening on ${h.url}/v1   model "auto" routes; explicit "provider/model" ids bypass routing\n  models with keys per tier → ${summary}${host !== "127.0.0.1" && host !== "localhost" ? "\n  WARNING: bound to a non-loopback host with no authentication" : ""}`);
+    const stop = () => h.close().then(() => process.exit(0));
+    process.on("SIGINT", stop); process.on("SIGTERM", stop);
+    return;
+  }
+
   if (cmd === "check") {
     const av = router.available();
     for (const [tier, models] of Object.entries(router.config.tiers)) {
@@ -138,6 +154,7 @@ async function main() {
 
   tiershift route "prompt" [--json] [--config tiershift.yaml]   decide a model for one prompt
   tiershift ask "prompt" [--json] [--config tiershift.yaml]     decide, call the model, fall back on failure
+  tiershift serve [--port 4141] [--host 127.0.0.1]              OpenAI-compatible proxy; clients set model "auto"
   tiershift check [--config tiershift.yaml]                      show which configured models have keys
   tiershift sync-models [--write]                                pull prices and limits from models.dev into prices.yaml
   tiershift report [--log path] [--json]                         tier mix, spend, and saving vs always-flagship from the decision log

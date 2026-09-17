@@ -16,7 +16,8 @@ export class OpenAICompatibleProvider implements Provider {
   readonly name: string;
   constructor(private opts: OpenAICompatibleOptions) { this.name = opts.name; }
 
-  async complete(req: CompletionRequest, signal?: AbortSignal): Promise<CompletionResult> {
+  /** Build the JSON body and headers for one chat-completions request. Shared by complete() and streamRaw(). */
+  private buildRequest(req: CompletionRequest, stream: boolean): { url: string; headers: Record<string, string>; body: Record<string, unknown> } {
     const url = `${this.opts.baseURL.replace(/\/$/, "")}/chat/completions`;
     const tokenParam = this.resolveTokenParam();
     const body: Record<string, unknown> = {
@@ -26,22 +27,31 @@ export class OpenAICompatibleProvider implements Provider {
       ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
       ...(req.tools?.length ? { tools: req.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters ?? { type: "object", properties: {} } } })) } : {}),
       ...(req.params ?? {}),
+      ...(stream ? { stream: true } : {}),
     };
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (this.opts.apiKey) headers.Authorization = `Bearer ${this.opts.apiKey}`;
+    return { url, headers, body };
+  }
 
-    const t0 = performance.now();
+  /** POST with the per-attempt timeout and caller abort wired in. Network failures become ProviderError. */
+  private async post(url: string, headers: Record<string, string>, body: unknown, signal: AbortSignal | undefined, timeoutMs: number): Promise<Response> {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), this.opts.timeoutMs ?? 120_000);
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     signal?.addEventListener("abort", () => ctrl.abort(), { once: true });
-    let res: Response;
     try {
-      res = await (this.opts.fetch ?? fetch)(url, { method: "POST", headers, body: JSON.stringify(body), signal: ctrl.signal });
+      return await (this.opts.fetch ?? fetch)(url, { method: "POST", headers, body: JSON.stringify(body), signal: ctrl.signal });
     } catch (e) {
-      clearTimeout(timer);
       throw new ProviderError(this.name, null, e instanceof Error ? e.message : String(e));
+    } finally {
+      clearTimeout(timer);
     }
-    clearTimeout(timer);
+  }
+
+  async complete(req: CompletionRequest, signal?: AbortSignal): Promise<CompletionResult> {
+    const { url, headers, body } = this.buildRequest(req, false);
+    const t0 = performance.now();
+    const res = await this.post(url, headers, body, signal, this.opts.timeoutMs ?? 120_000);
     const text = await res.text();
     let json: any;
     try { json = JSON.parse(text); } catch { json = { raw: text }; }
@@ -58,6 +68,24 @@ export class OpenAICompatibleProvider implements Provider {
       latencyMs: Math.round(performance.now() - t0),
       raw: json,
     };
+  }
+
+  /**
+   * Start a streaming chat completion and return the upstream Response untouched, so a caller can pipe
+   * `res.body` (server-sent events) straight through. The response headers have arrived; the body has not.
+   * A non-2xx status is thrown as ProviderError after reading the error body.
+   * The timeout here covers only the time to first byte; the stream itself is bounded by the caller's signal.
+   */
+  async streamRaw(req: CompletionRequest, signal?: AbortSignal): Promise<Response> {
+    const { url, headers, body } = this.buildRequest(req, true);
+    const res = await this.post(url, headers, body, signal, this.opts.timeoutMs ?? 120_000);
+    if (!res.ok) {
+      const text = await res.text();
+      let json: any;
+      try { json = JSON.parse(text); } catch { json = { raw: text }; }
+      throw new ProviderError(this.name, res.status, json?.error?.message ?? text.slice(0, 300), json);
+    }
+    return res;
   }
 
   private resolveTokenParam(): "max_tokens" | "max_completion_tokens" {
