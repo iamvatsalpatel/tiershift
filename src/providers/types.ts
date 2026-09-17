@@ -32,6 +32,11 @@ export interface CompletionResult {
 export interface Provider {
   readonly name: string;
   complete(req: CompletionRequest, signal?: AbortSignal): Promise<CompletionResult>;
+  /**
+   * Optional. Start a streaming completion and return the upstream fetch Response so its SSE body can be piped
+   * through unchanged. Adapters that cannot stream in the OpenAI wire format leave this undefined.
+   */
+  streamRaw?(req: CompletionRequest, signal?: AbortSignal): Promise<Response>;
 }
 
 export class ProviderError extends Error {

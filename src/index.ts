@@ -10,3 +10,5 @@ export { logEntry, readLog, fromDecision, DEFAULT_LOG } from "./log.js";
 export type { LogEntry } from "./log.js";
 export { buildReport, tune, entryCost, estCostFor, modelForTier } from "./analytics.js";
 export type { Report, TierStat, TuneResult, AnalyticsOptions } from "./analytics.js";
+export { createProxy, startProxy, toOpenAIResponse, DECISION_HEADERS } from "./proxy.js";
+export type { ProxyOptions, ProxyHandle } from "./proxy.js";

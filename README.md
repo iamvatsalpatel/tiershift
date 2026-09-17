@@ -143,6 +143,37 @@ Signals you can use in conditions: `difficulty`, `stakes`, `output_length` (0 to
 
 The Jev model is pinned to `jev-1.13.0` in the YAML. Routing depends on the model, so upgrading is a deliberate edit, not a silent drift.
 
+## Use it from any language: the proxy
+
+```bash
+tiershift serve                       # http://127.0.0.1:4141/v1
+```
+
+Point any OpenAI-compatible client at it and set `model` to `auto`. No other code changes. Python:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://127.0.0.1:4141/v1", api_key="unused")
+
+r = client.chat.completions.with_raw_response.create(
+    model="auto",
+    messages=[{"role": "user", "content": "Review this clause for legal risk: ..."}],
+)
+print(r.headers["x-tiershift-model"], r.headers["x-tiershift-tier"])   # openai/gpt-5.6-sol flagship
+print(r.headers["x-tiershift-reason"])   # rule "difficulty < 1.3" -> mid | override "stakes > 1.5" -> at_least flagship
+print(r.parse().choices[0].message.content)
+```
+
+- `model: "auto"` routes. `model: "auto:billing"` routes and writes `billing` as the tag in the decision log.
+- An explicit id such as `model: "deepseek/deepseek-flash"` bypasses routing and costs no Jev call.
+- `GET /v1/models` lists `auto` plus every configured model with its tier and whether a key is present.
+- Every response carries the decision in headers: `x-tiershift-model`, `x-tiershift-tier`, `x-tiershift-fallback`, `x-tiershift-confidence`, `x-tiershift-jev-ms`, `x-tiershift-reason`, plus `x-tiershift-fell-back: true` when the fallback answered. Headers never contain message text or keys.
+- `stream: true` pipes the provider's server-sent events through unchanged. Streaming works for OpenAI-compatible providers. A request that routes to an Anthropic model with `stream: true` gets a clear 400; send `stream: false` for that tier in v0.1.
+- Fallback to the next tier applies when the chosen provider fails before answering. A provider 4xx passes through with its status.
+
+The proxy has no authentication. It binds to `127.0.0.1` by default. Bind elsewhere with `--host` only behind your own auth.
+
 ## Prove the saving on your own traffic
 
 Every decision is logged to `.tiershift/decisions.jsonl` by default: signals, tier, model, cost, latency, and the reasons. Never message text. Two commands read it.
@@ -215,6 +246,7 @@ All verified against live APIs on 2026-09-17.
 ## CLI
 
 ```bash
+tiershift serve [--port 4141]          # OpenAI-compatible proxy; clients set model "auto"
 tiershift check                        # which configured models have keys
 tiershift route "your prompt"          # decide only; print signals and reasons; no model call
 tiershift ask "your prompt"            # decide, call the model, fall back on failure
@@ -253,7 +285,7 @@ Caveats: one judge model from the same family as the flagship arm. Expected tier
 
 v0.1.0. Library and CLI work end to end across four tiers. 34 unit tests, no network needed. CI runs on Node 20 and 22. Benchmark harness with cached reruns.
 
-Roadmap: OpenAI-compatible proxy with `model: "auto"`, Vercel AI SDK middleware, a post-answer quality gate that retries one tier up, a retry rule for empty answers from reasoning models, and a second benchmark with a bolder policy. See [docs/PLAN.md](docs/PLAN.md).
+Roadmap: Vercel AI SDK middleware, a post-answer quality gate that retries one tier up, a retry rule for empty answers from reasoning models, and a second benchmark with a bolder policy. See [docs/PLAN.md](docs/PLAN.md).
 
 ## License
 
