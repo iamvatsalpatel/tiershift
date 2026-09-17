@@ -5,7 +5,7 @@ import type { CodeSignals, Config, Signals } from "./types.js";
 const base: Signals = {
   difficulty: 0, difficulty_confidence: 1, needs_reasoning: 0, stakes: 0, stakes_confidence: 1,
   domain: "general", domain_confidence: 1, has_code: 0, ambiguous: 0, output_length: 0,
-  creative: 0, safety_sensitive: 0, trivial_ack: 0,
+  creative: 0, safety_sensitive: 0, trivial_ack: 0, mid_tier_ok: 0.5,
 };
 const code: CodeSignals = { est_input_tokens: 100, has_tools: false, tool_count: 0, step: null, retries: 0, turn_count: 1 };
 
@@ -41,7 +41,7 @@ describe("evalCondition", () => {
     expect(evalCondition("retries >= 1 or tier == local", vars)).toBe(true);
   });
   it("rejects unknown variables", () => {
-    expect(() => evalCondition("nope > 1", vars)).toThrow(/Unknown variable/);
+    expect(() => evalCondition("nope > 1", vars)).toThrow(/unknown signal "nope"/);
   });
 });
 

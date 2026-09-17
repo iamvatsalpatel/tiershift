@@ -126,7 +126,7 @@ rules:                                  # first match sets the base tier
   - { when: difficulty < 1.3,   tier: mid }
   - { default: flagship }
 
-overrides:                              # all apply, in order
+overrides:                              # all apply, in order: at_least (floor), at_most (ceiling), up (move N)
   - { when: stakes > 1.5,                at_least: flagship }
   - { when: safety_sensitive > 0.7,      at_least: flagship }
   - { when: needs_reasoning > 0.8,       at_least: mid }
@@ -139,7 +139,9 @@ budget:
   prefer: order                         # order | cheapest
 ```
 
-Signals you can use in conditions: `difficulty`, `stakes`, `output_length` (0 to 2), `needs_reasoning`, `has_code`, `ambiguous`, `creative`, `safety_sensitive`, `trivial_ack` (0 to 1), `domain` (string), `difficulty_confidence`, `stakes_confidence`, plus code signals `has_tools`, `tool_count`, `est_input_tokens`, `retries`, `step`, `turn_count`, and the current `tier`.
+Signals you can use in conditions: `difficulty`, `stakes`, `output_length` (0 to 2), `needs_reasoning`, `has_code`, `ambiguous`, `creative`, `safety_sensitive`, `trivial_ack`, `mid_tier_ok` (0 to 1), `domain` (string), `difficulty_confidence`, `stakes_confidence`, `domain_confidence`, plus code signals `has_tools`, `tool_count`, `est_input_tokens`, `retries`, `step`, `turn_count`, and the current `tier`. Overrides take `at_least` (floor), `at_most` (ceiling), or `up` (move N tiers). A typo in any name fails at load time with a did-you-mean hint.
+
+The Jev model is pinned to `jev-1.13.0` in the YAML. Routing depends on the model, so upgrading is a deliberate edit, not a silent drift.
 
 ## Prove the saving on your own traffic
 
@@ -208,6 +210,7 @@ All verified against live APIs on 2026-09-17.
 | OpenAI gpt-5.6 | rejects function tools unless `reasoning_effort: none` | default config sets it per model |
 | DeepSeek flash | thinks by default and spends the token budget on reasoning | default config disables thinking on the fast tier |
 | Ollama | 60 times slower with `max_completion_tokens` | sends `max_tokens` |
+| Any reasoning model | spends output tokens thinking first; a small budget returns an empty answer at full price | raises `max_tokens` to `defaults.min_output_tokens` (1024), and treats an empty answer with finish reason `length` as a failure so the fallback runs |
 
 ## CLI
 

@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+- `mid_tier_ok` signal: Jev's direct judgment of whether a mid-tier model would answer well. Not used by the default rules; a commented `at_most` example shows how.
+- `at_most` override action, the mirror of `at_least`: lowers the tier to a ceiling.
+- Load-time policy validation. Unknown signals, tiers, or providers, unparsable conditions, a non-positive `up`, a `default` that is not last, and an override with no action all fail at `loadConfig()` with the location quoted and a did-you-mean hint.
+- `defaults.min_output_tokens` (default 1024): a floor on `max_tokens` for models with the `reasoning` capability.
+- Empty-answer retry: an empty answer with finish reason `length` counts as a failure, so `complete()` moves to the fallback.
+- `tiershift report` shows estimated versus actual cost per tier when both kinds of entries exist.
+- Router, security, and validation test suites. Test count 57 → 92.
+
+### Changed
+- The Jev model is pinned to `jev-1.13.0` by default instead of `jev-latest`. Routing depends on the model, so upgrades are deliberate.
+- Provider error text is redacted of every configured API key before it reaches an attempt record or a thrown error.
+
 ## [0.1.0] - 2026-09-17
 
 ### Added

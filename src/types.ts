@@ -45,7 +45,21 @@ export interface Signals {
   creative: number;
   safety_sensitive: number;
   trivial_ack: number;
+  /** Probability that a competent mid-tier model would answer well without expert-level reasoning. */
+  mid_tier_ok: number;
 }
+
+/** Every signal name a policy condition may reference. One source of truth for policy.ts and config.ts. */
+export const KNOWN_SIGNALS = [
+  // Jev signals
+  "difficulty", "difficulty_confidence", "needs_reasoning", "stakes", "stakes_confidence", "domain", "domain_confidence",
+  "has_code", "ambiguous", "output_length", "creative", "safety_sensitive", "trivial_ack", "mid_tier_ok",
+  // code signals
+  "est_input_tokens", "has_tools", "tool_count", "step", "retries", "turn_count",
+  // policy state
+  "tier",
+] as const;
+export type KnownSignal = (typeof KNOWN_SIGNALS)[number];
 
 /** Free signals computed in code. */
 export interface CodeSignals {
@@ -87,7 +101,11 @@ export interface Rule {
 
 export interface Override {
   when: string;
+  /** Raise to this tier when the current tier is lower. */
   at_least?: string;
+  /** Lower to this tier when the current tier is higher. Mirror of `at_least`. */
+  at_most?: string;
+  /** Move up this many tiers, capped at the top. */
   up?: number;
 }
 
@@ -99,14 +117,18 @@ export interface Config {
   models?: Record<string, ModelMeta>;
   budget?: { max_cost_per_call?: number; prefer?: "order" | "cheapest" };
   fallback?: "up" | "none";
-  /** Defaults applied to every completion call. */
-  defaults?: { max_tokens?: number; temperature?: number };
+  /** Defaults applied to every completion call. `min_output_tokens` is a floor applied to reasoning models, default 1024. */
+  defaults?: { max_tokens?: number; temperature?: number; min_output_tokens?: number };
   /** Decision log. On by default at `.tiershift/decisions.jsonl`. */
   log?: { enabled?: boolean; path?: string };
   /** When no model at or above the chosen tier has a key, use the best available model below. Default true. */
   degrade?: boolean;
+  /** Jev model and timeout. Defaults to the pinned `DEFAULT_JEV_MODEL`; routing changes when the model changes. */
   jev?: { model?: string; timeout_ms?: number };
 }
+
+/** Pinned Jev version. Routing decisions depend on the model, so upgrades are deliberate: set `jev.model` in the YAML. */
+export const DEFAULT_JEV_MODEL = "jev-1.13.0";
 
 export interface Decision {
   model: string;

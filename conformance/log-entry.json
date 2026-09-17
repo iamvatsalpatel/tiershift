@@ -20,7 +20,8 @@
     "output_length": 1.0,
     "creative": 0.0,
     "safety_sensitive": 0.0,
-    "trivial_ack": 0.0
+    "trivial_ack": 0.0,
+    "mid_tier_ok": 0.62
   },
   "code_signals": {
     "est_input_tokens": 100,

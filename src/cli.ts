@@ -54,6 +54,8 @@ async function main() {
     console.log(`${r.n} decisions in ${path}\n${r.from} → ${r.to}\n`);
     console.log(`${"tier".padEnd(10)}${"share".padStart(7)}${"n".padStart(6)}${"cost".padStart(11)}${"confidence".padStart(12)}${"jev p50".padStart(9)}`);
     for (const t of r.tiers) console.log(`${t.tier.padEnd(10)}${pctf(t.share).padStart(7)}${String(t.n).padStart(6)}${usd(t.cost).padStart(11)}${t.mean_confidence.toFixed(2).padStart(12)}${(t.p50_jev_ms + " ms").padStart(9)}`);
+    const checks = r.tiers.filter((t) => t.estimate_check);
+    if (checks.length) { console.log(`\nestimate vs actual (entries where a model was called):`); for (const t of checks) { const c = t.estimate_check!; console.log(`  ${t.tier.padEnd(10)} n=${String(c.n).padEnd(5)} estimated ${usd(c.est)}  actual ${usd(c.actual)}  (estimate is ${c.ratio >= 1 ? `${((c.ratio - 1) * 100).toFixed(0)}% high` : `${((1 - c.ratio) * 100).toFixed(0)}% low`})`); } }
     console.log(`\n${"model".padEnd(34)}${"n".padStart(6)}${"cost".padStart(11)}`);
     for (const m of r.models) console.log(`${m.model.padEnd(34)}${String(m.n).padStart(6)}${usd(m.cost).padStart(11)}`);
     const actual = entries.filter((e) => e.kind === "complete").length;

@@ -47,10 +47,19 @@ models:
 
 defaults:
   max_tokens: 4096
+  min_output_tokens: 1024      # floor for models with the `reasoning` cap: they spend output tokens thinking first, and a small budget returns an empty answer at full price
+
+# Jev is pinned. Routing decisions depend on the model, so an upgrade must be a deliberate edit here, not a silent drift.
+# Check https://docs.typesafe.ai/models for newer versions and re-run `tiershift tune` on your log before switching.
+jev:
+  model: jev-1.13.0
 
 # Rules run in order. The first match sets the base tier.
 # Signals: difficulty (0-2), stakes (0-2), output_length (0-2), needs_reasoning, has_code,
-# ambiguous, creative, safety_sensitive, trivial_ack (all 0-1 probabilities).
+# ambiguous, creative, safety_sensitive, trivial_ack, mid_tier_ok (all 0-1 probabilities),
+# plus difficulty_confidence, stakes_confidence, domain_confidence (0-1) and domain (string).
+# Code signals: has_tools, tool_count, est_input_tokens, retries, step, turn_count. Overrides also see `tier`.
+# A typo in a signal or tier name fails at load time with a did-you-mean hint.
 rules:
   - when: trivial_ack > 0.8
     tier: local
@@ -60,7 +69,7 @@ rules:
     tier: mid
   - default: flagship
 
-# Overrides run after rules, in order. `at_least` raises to a floor. `up` moves N tiers up.
+# Overrides run after rules, in order. `at_least` raises to a floor. `at_most` lowers to a ceiling. `up` moves N tiers up.
 overrides:
   - when: stakes > 1.5
     at_least: flagship
@@ -74,6 +83,9 @@ overrides:
     up: 1
   - when: retries >= 1
     up: 1
+  # Bolder: let Jev's direct judgment pull hard-looking but ordinary prompts down to the mid tier when nothing is at stake.
+  # Try it with `tiershift tune --candidate` on your own log before enabling.
+  # - { when: mid_tier_ok > 0.8 and stakes < 1.5, at_most: mid }
 
 budget:
   max_cost_per_call: 0.10      # USD. Models above this estimate are skipped within a tier.

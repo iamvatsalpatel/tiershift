@@ -3,9 +3,11 @@ import { TypeSafeClient } from "@typesafe-ai/sdk";
 import { loadConfig, splitModel } from "./config.js";
 import { applyPolicy, estimateOutputTokens } from "./policy.js";
 import { askJev, codeSignals } from "./signals.js";
+import type { JevClient } from "./signals.js";
 import { buildProviders } from "./providers/index.js";
 import type { Provider } from "./providers/index.js";
 import { ProviderError } from "./providers/index.js";
+import { DEFAULT_JEV_MODEL } from "./types.js";
 import type { Attempt, CompleteInput, CompleteResult, Config, Decision, ModelMeta, RouteInput } from "./types.js";
 import { DEFAULT_LOG, fromDecision, logEntry } from "./log.js";
 
@@ -17,6 +19,10 @@ export interface RouterOptions {
   typesafeApiKey?: string;
   /** Decision log path. Defaults to config `log.path`, then `.tiershift/decisions.jsonl`. `false` disables. */
   log?: string | false;
+  /** @internal Inject a fake Jev client. Tests only. */
+  __jevClient?: JevClient;
+  /** @internal Inject fake providers. Tests only. */
+  __providers?: Record<string, Provider>;
 }
 
 export interface Router {
@@ -64,17 +70,23 @@ function pickInTier(cfg: Config, tier: string, inTok: number, outTok: number, ne
 export function createRouter(opts: RouterOptions = {}): Router {
   const env = opts.env ?? process.env;
   const config = typeof opts.config === "object" ? opts.config : loadConfig(opts.config);
-  const client = new TypeSafeClient({ apiKey: opts.typesafeApiKey ?? env.TYPESAFE_API_KEY, defaultModel: config.jev?.model ?? "jev-latest" });
+  const jevModel = config.jev?.model ?? DEFAULT_JEV_MODEL;
+  const client: JevClient = opts.__jevClient ?? new TypeSafeClient({ apiKey: opts.typesafeApiKey ?? env.TYPESAFE_API_KEY, defaultModel: jevModel });
   const order = Object.keys(config.tiers);
-  const providers = buildProviders(config, env);
+  const providers = opts.__providers ?? buildProviders(config, env);
   const logPath = opts.log === false || config.log?.enabled === false ? null : typeof opts.log === "string" ? opts.log : config.log?.path ?? DEFAULT_LOG;
   const write = (e: Parameters<typeof logEntry>[1]) => { if (logPath) try { logEntry(logPath, e); } catch { /* logging never breaks routing */ } };
 
   const available = () => Object.fromEntries(order.map((t) => [t, config.tiers[t].filter((id) => hasKey(config, splitModel(id).provider, env))]));
 
+  // Every secret this router knows about. Provider errors sometimes echo request headers; never let a key reach a log or an error message.
+  const secrets = [opts.typesafeApiKey, env.TYPESAFE_API_KEY, ...Object.values(config.providers).map((p) => (p.api_key_env ? env[p.api_key_env] : undefined))]
+    .filter((s): s is string => typeof s === "string" && s.length >= 8);
+  const redact = (text: string) => secrets.reduce((t, s) => t.split(s).join("[redacted]"), text);
+
   async function route(input: RouteInput): Promise<Decision> {
     const code = codeSignals(input);
-    const jev = await askJev(client, input, config.jev?.model, config.jev?.timeout_ms);
+    const jev = await askJev(client, input, jevModel, config.jev?.timeout_ms);
     const policy = applyPolicy(config, jev.signals, code);
     const outTok = estimateOutputTokens(jev.signals.output_length);
     const maxCost = input.maxCost ?? config.budget?.max_cost_per_call;
@@ -138,20 +150,30 @@ export function createRouter(opts: RouterOptions = {}): Router {
     const decision = await route({ ...input, __noLog: true });
     const candidates = [decision.model, decision.fallback].filter((m): m is string => Boolean(m));
     const attempts: Attempt[] = [];
+    const minOut = config.defaults?.min_output_tokens ?? 1024;
     for (const id of candidates) {
       const { provider: pname, model } = splitModel(id);
       const provider = providers[pname];
       const t0 = performance.now();
-      if (!provider) { attempts.push({ model: id, ok: false, latency_ms: 0, error: `provider "${pname}" has no key` }); continue; }
+      if (!provider) { attempts.push({ model: id, ok: false, latency_ms: 0, error: `provider "${pname}" has no key`, status: null }); continue; }
+      // Reasoning models spend output tokens on thinking first. A small budget returns an empty answer at full price.
+      let maxTokens = input.maxTokens ?? config.defaults?.max_tokens ?? 4096;
+      if (config.models?.[id]?.caps?.includes("reasoning") && maxTokens < minOut) {
+        decision.reason.push(`raised max_tokens to ${minOut} for reasoning model ${id}`);
+        maxTokens = minOut;
+      }
       try {
         const r = await provider.complete({
           model,
           messages: input.messages,
           tools: input.tools,
-          maxTokens: input.maxTokens ?? config.defaults?.max_tokens ?? 4096,
+          maxTokens,
           temperature: input.temperature ?? config.defaults?.temperature,
           params: config.models?.[id]?.params,
         }, input.signal);
+        if (r.text.trim().length === 0 && r.toolCalls.length === 0 && r.finishReason === "length") {
+          throw new ProviderError(pname, null, `empty_answer:length (output budget ${maxTokens} consumed before any answer text; ${r.usage.outputTokens} output tokens billed)`);
+        }
         attempts.push({ model: id, ok: true, latency_ms: r.latencyMs });
         const cost = actualCost(config.models?.[id], r.usage);
         write(fromDecision(decision, { kind: "complete", model: id, tier: order[Math.max(0, order.findIndex((t) => config.tiers[t].includes(id)))], fell_back: id !== decision.model, cost_usd: cost, input_tokens: r.usage.inputTokens, output_tokens: r.usage.outputTokens, model_latency_ms: r.latencyMs, tag: input.tag }));
@@ -164,7 +186,7 @@ export function createRouter(opts: RouterOptions = {}): Router {
       } catch (e) {
         if (input.signal?.aborted) throw e;
         const pe = e instanceof ProviderError ? e : null;
-        attempts.push({ model: id, ok: false, latency_ms: Math.round(performance.now() - t0), error: e instanceof Error ? e.message : String(e), status: pe?.status ?? null });
+        attempts.push({ model: id, ok: false, latency_ms: Math.round(performance.now() - t0), error: redact(e instanceof Error ? e.message : String(e)), status: pe?.status ?? null });
       }
     }
     throw new Error(`tiershift: every candidate failed. ${attempts.map((a) => `${a.model}: ${a.error}`).join(" | ")}`);
