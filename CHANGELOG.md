@@ -19,6 +19,9 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Changed
 - The Jev model is pinned to `jev-1.13.0` by default instead of `jev-latest`. Routing depends on the model, so upgrades are deliberate.
 - Provider error text is redacted of every configured API key before it reaches an attempt record or a thrown error.
+=======
+- Python package `tiershift` on PyPI (`python/`): `create_router`, `route`, `complete`, CLI with `route`, `ask`, `check`, `report`, `tune`. Shares the YAML, prices, and decision-log formats with the npm package and passes the same conformance fixtures.
+>>>>>>> d7cc31a (Add Python package: tiershift on PyPI)
 
 ## [0.1.0] - 2026-09-17
 
