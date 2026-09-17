@@ -3,7 +3,11 @@ import { applyPolicy, estimateOutputTokens } from "./policy.js";
 import type { LogEntry } from "./log.js";
 import type { Config, ModelMeta } from "./types.js";
 
-export interface TierStat { tier: string; n: number; share: number; cost: number; est_cost: number; mean_confidence: number; p50_jev_ms: number }
+export interface TierStat {
+  tier: string; n: number; share: number; cost: number; est_cost: number; mean_confidence: number; p50_jev_ms: number;
+  /** Present when the tier has entries with actual usage: how far the estimate was from the actual cost on those entries. */
+  estimate_check?: { n: number; est: number; actual: number; ratio: number };
+}
 export interface Report {
   n: number; from: string | null; to: string | null;
   tiers: TierStat[];
@@ -47,7 +51,11 @@ export function buildReport(entries: LogEntry[], config: Config, opts: Analytics
   const flagshipModel = opts.baselineModel ?? modelForTier(config, flagshipTier, opts.tiers) ?? null;
   const tiers: TierStat[] = order.map((tier) => {
     const es = entries.filter((e) => e.tier === tier);
-    return { tier, n: es.length, share: es.length / (entries.length || 1), cost: sum(es.map(entryCost)), est_cost: sum(es.map((e) => e.est_cost_usd ?? 0)), mean_confidence: es.length ? sum(es.map((e) => e.confidence)) / es.length : 0, p50_jev_ms: pct(es.map((e) => e.jev_latency_ms), 0.5) };
+    const stat: TierStat = { tier, n: es.length, share: es.length / (entries.length || 1), cost: sum(es.map(entryCost)), est_cost: sum(es.map((e) => e.est_cost_usd ?? 0)), mean_confidence: es.length ? sum(es.map((e) => e.confidence)) / es.length : 0, p50_jev_ms: pct(es.map((e) => e.jev_latency_ms), 0.5) };
+    // Where a model was actually called, compare the pre-call estimate with the billed cost so users can see the estimate error.
+    const both = es.filter((e) => e.cost_usd !== null && e.est_cost_usd !== null);
+    if (both.length) { const est = sum(both.map((e) => e.est_cost_usd as number)), actual = sum(both.map((e) => e.cost_usd as number)); stat.estimate_check = { n: both.length, est, actual, ratio: actual > 0 ? est / actual : 0 }; }
+    return stat;
   });
   const modelIds = [...new Set(entries.map((e) => e.model))].sort();
   const models = modelIds.map((model) => { const es = entries.filter((e) => e.model === model); return { model, n: es.length, cost: sum(es.map(entryCost)), est_cost: sum(es.map((e) => e.est_cost_usd ?? 0)) }; });

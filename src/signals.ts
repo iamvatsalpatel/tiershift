@@ -50,6 +50,9 @@ export const QUESTIONS = {
   trivial_ack: noul(
     "Is `request.user_message` a trivial acknowledgement, confirmation, greeting, or pure formatting request that needs no thought?",
   ),
+  mid_tier_ok: noul(
+    "Would a competent mid-tier model (strong but not frontier) answer `request.user_message` well without expert-level reasoning?",
+  ),
 } as const;
 
 export interface JevResult {
@@ -96,7 +99,10 @@ export function codeSignals(input: RouteInput): CodeSignals {
   };
 }
 
-export async function askJev(client: TypeSafeClient, input: RouteInput, model?: string, timeout?: number): Promise<JevResult> {
+/** The subset of the TypeSafe client the router needs. Lets tests inject a fake. */
+export type JevClient = Pick<TypeSafeClient, "systemOne">;
+
+export async function askJev(client: JevClient, input: RouteInput, model?: string, timeout?: number): Promise<JevResult> {
   const t0 = performance.now();
   const res = await client.systemOne({ state: buildState(input), questions: QUESTIONS, model }, { timeout });
   const a = res.answers;
@@ -115,6 +121,7 @@ export async function askJev(client: TypeSafeClient, input: RouteInput, model?: 
       creative: a.creative.noul,
       safety_sensitive: a.safety_sensitive.noul,
       trivial_ack: a.trivial_ack.noul,
+      mid_tier_ok: a.mid_tier_ok.noul,
     },
     latency_ms: Math.round(performance.now() - t0),
     input_tokens: res.usage.input_tokens,

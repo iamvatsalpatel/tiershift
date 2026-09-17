@@ -15,7 +15,7 @@ const cfg: Config = {
 };
 const sig = (difficulty: number, extra: Partial<LogEntry["signals"]> = {}): LogEntry["signals"] => ({
   difficulty, difficulty_confidence: 0.9, needs_reasoning: 0.1, stakes: 0.1, stakes_confidence: 0.9, domain: "general", domain_confidence: 0.9,
-  has_code: 0, ambiguous: 0, output_length: 1, creative: 0, safety_sensitive: 0, trivial_ack: 0, ...extra,
+  has_code: 0, ambiguous: 0, output_length: 1, creative: 0, safety_sensitive: 0, trivial_ack: 0, mid_tier_ok: 0.5, ...extra,
 });
 const entry = (tier: string, model: string, difficulty: number, over: Partial<LogEntry> = {}): LogEntry => ({
   ts: "2026-09-17T00:00:00Z", kind: "route", model, tier, requested_tier: tier, degraded: false, fell_back: false, confidence: 0.9,
@@ -40,6 +40,12 @@ describe("buildReport", () => {
   it("prefers actual cost over the estimate when a model was called", () => {
     const r = buildReport([entry("mid", "p/m", 1.0, { kind: "complete", est_cost_usd: 0.01, cost_usd: 0.02 })], cfg);
     expect(r.total_cost).toBeCloseTo(0.02);
+  });
+  it("reports estimate vs actual per tier when both exist", () => {
+    const r = buildReport([entry("mid", "p/m", 1.0, { kind: "complete", est_cost_usd: 0.01, cost_usd: 0.02 }), entry("mid", "p/m", 1.0, { est_cost_usd: 0.01 })], cfg);
+    const mid = r.tiers.find((t) => t.tier === "mid")!;
+    expect(mid.estimate_check).toEqual({ n: 1, est: 0.01, actual: 0.02, ratio: 0.5 });
+    expect(r.tiers.find((t) => t.tier === "fast")!.estimate_check).toBeUndefined();
   });
   it("handles an empty log", () => {
     const r = buildReport([], cfg);

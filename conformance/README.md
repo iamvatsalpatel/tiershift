@@ -2,7 +2,7 @@
 
 Both packages, TypeScript and Python, must produce identical decisions from identical inputs. These fixtures are the contract.
 
-- `policy.yaml` — a policy that exercises every rule and override form.
+- `policy.yaml` — a policy that exercises every rule and override form. A case may name its own `policy` file; `policy-at-most.yaml` adds an `at_most` override.
 - `cases.json` — signals plus code signals in, expected tier and reason lines out.
 - `log-entry.json` — one decision log line. Both packages must read and write this shape.
 
