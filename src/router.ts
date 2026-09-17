@@ -71,7 +71,15 @@ export function createRouter(opts: RouterOptions = {}): Router {
   const env = opts.env ?? process.env;
   const config = typeof opts.config === "object" ? opts.config : loadConfig(opts.config);
   const jevModel = config.jev?.model ?? DEFAULT_JEV_MODEL;
-  const client: JevClient = opts.__jevClient ?? new TypeSafeClient({ apiKey: opts.typesafeApiKey ?? env.TYPESAFE_API_KEY, defaultModel: jevModel });
+  // Built on first route(). check, report, tune, and sync-models need no Jev key, and a missing key must not break them.
+  let clientCache: JevClient | undefined = opts.__jevClient;
+  const client = (): JevClient => {
+    if (clientCache) return clientCache;
+    const apiKey = opts.typesafeApiKey ?? env.TYPESAFE_API_KEY;
+    if (!apiKey) throw new Error("tiershift: TYPESAFE_API_KEY is not set. Routing needs a TypeSafe key; get one at https://typesafe.ai and export TYPESAFE_API_KEY=... or add it to .env");
+    clientCache = new TypeSafeClient({ apiKey, defaultModel: jevModel });
+    return clientCache;
+  };
   const order = Object.keys(config.tiers);
   const providers = opts.__providers ?? buildProviders(config, env);
   const logPath = opts.log === false || config.log?.enabled === false ? null : typeof opts.log === "string" ? opts.log : config.log?.path ?? DEFAULT_LOG;
@@ -86,7 +94,7 @@ export function createRouter(opts: RouterOptions = {}): Router {
 
   async function route(input: RouteInput): Promise<Decision> {
     const code = codeSignals(input);
-    const jev = await askJev(client, input, jevModel, config.jev?.timeout_ms);
+    const jev = await askJev(client(), input, jevModel, config.jev?.timeout_ms);
     const policy = applyPolicy(config, jev.signals, code);
     const outTok = estimateOutputTokens(jev.signals.output_length);
     const maxCost = input.maxCost ?? config.budget?.max_cost_per_call;

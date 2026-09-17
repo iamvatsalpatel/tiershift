@@ -22,3 +22,21 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  python:
+    name: Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv sync --frozen
+        working-directory: python
+      - run: uv run pytest -q
+        working-directory: python
+      - run: uv build
+        working-directory: python

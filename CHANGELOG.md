@@ -18,6 +18,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Python package `tiershift` on PyPI (`python/`): `create_router`, `route`, `complete`, CLI with `route`, `ask`, `check`, `report`, `tune`. Shares the YAML, prices, decision-log format, and conformance fixtures with the npm package, including `mid_tier_ok`, `at_most`, load-time validation, the pinned Jev model, `min_output_tokens`, empty-answer retry, key redaction, and the per-tier estimate check.
 
 ### Changed
+- The Jev client is created on first `route()`. `check`, `report`, `tune`, `sync-models`, and `--help` work without `TYPESAFE_API_KEY`; routing without it fails with a clear message.
 - The Jev model is pinned to `jev-1.13.0` by default instead of `jev-latest`. Routing depends on the model, so upgrades are deliberate.
 - Provider error text is redacted of every configured API key before it reaches an attempt record or a thrown error.
 

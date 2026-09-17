@@ -18,7 +18,8 @@ check bash -c '! npm pack --dry-run 2>&1 | grep -qE "\.test\.|src/|bench/|\.env"
 check bash -c 'npm pack --dry-run 2>&1 | grep -q " tiershift.yaml" && npm pack --dry-run 2>&1 | grep -q " prices.yaml" && npm pack --dry-run 2>&1 | grep -q " LICENSE"'
 
 echo "== 3. secrets: nothing that looks like a key in tracked files =="
-check bash -c '! git grep -nE "(sk-[A-Za-z0-9_-]{16,}|ts_[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})" -- . ":!package-lock.json" ":!python/uv.lock"'
+# Test files hold deliberately fake keys (sk-test-..., sk-live-ABCDEFGH...) to prove redaction works; exclude them.
+check bash -c '! git grep -nE "(sk-[A-Za-z0-9_-]{16,}|ts_[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})" -- . ":!package-lock.json" ":!python/uv.lock" ":!*.test.ts" ":!python/tests/*"'
 check bash -c '! git ls-files | grep -xq ".env"'
 check bash -c 'git check-ignore -q .env && git check-ignore -q .tiershift/decisions.jsonl'
 

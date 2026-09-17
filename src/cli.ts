@@ -18,6 +18,18 @@ function loadDotenv() {
   } catch { /* no .env is fine */ }
 }
 
+function printHelp() {
+  console.log(`tiershift — shift every LLM call to the cheapest model that can handle it.
+
+  tiershift route "prompt" [--json] [--config tiershift.yaml]   decide a model for one prompt
+  tiershift ask "prompt" [--json] [--config tiershift.yaml]     decide, call the model, fall back on failure
+  tiershift serve [--port 4141] [--host 127.0.0.1]              OpenAI-compatible proxy; clients set model "auto"
+  tiershift check [--config tiershift.yaml]                      show which configured models have keys
+  tiershift sync-models [--write]                                pull prices and limits from models.dev into prices.yaml
+  tiershift report [--log path] [--json]                         tier mix, spend, and saving vs always-flagship from the decision log
+  tiershift tune --candidate other.yaml [--log path]             replay logged decisions against another policy; no API calls`);
+}
+
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
   const cfgIdx = rest.indexOf("--config");
@@ -99,6 +111,12 @@ async function main() {
     return;
   }
 
+  const KNOWN = new Set(["serve", "check", "route", "ask"]);
+  if (!cmd || !KNOWN.has(cmd)) {
+    if (cmd && cmd !== "help" && cmd !== "--help" && cmd !== "-h") console.error(`unknown command "${cmd}"\n`);
+    printHelp();
+    process.exit(cmd && cmd !== "help" && cmd !== "--help" && cmd !== "-h" ? 2 : 0);
+  }
   const router = createRouter({ config: cfgPath, log: logPathArg });
 
   if (cmd === "serve") {
@@ -151,15 +169,7 @@ async function main() {
     return;
   }
 
-  console.log(`tiershift — shift every LLM call to the cheapest model that can handle it.
 
-  tiershift route "prompt" [--json] [--config tiershift.yaml]   decide a model for one prompt
-  tiershift ask "prompt" [--json] [--config tiershift.yaml]     decide, call the model, fall back on failure
-  tiershift serve [--port 4141] [--host 127.0.0.1]              OpenAI-compatible proxy; clients set model "auto"
-  tiershift check [--config tiershift.yaml]                      show which configured models have keys
-  tiershift sync-models [--write]                                pull prices and limits from models.dev into prices.yaml
-  tiershift report [--log path] [--json]                         tier mix, spend, and saving vs always-flagship from the decision log
-  tiershift tune --candidate other.yaml [--log path]             replay logged decisions against another policy; no API calls`);
 }
 
 main().catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); });

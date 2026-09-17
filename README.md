@@ -287,7 +287,7 @@ Caveats: one judge model from the same family as the flagship arm. Expected tier
 
 ## Status
 
-v0.1.0. Library, CLI, and proxy work end to end across four tiers. 111 unit tests, no network needed. CI runs on Node 20 and 22. Benchmark harness with cached reruns.
+v0.1.0. Library, CLI, and proxy work end to end across four tiers. 113 TypeScript tests and 78 Python tests, no network needed. CI runs on Node 20 and 22 and Python 3.10 and 3.12. Benchmark harness with cached reruns.
 
 Roadmap: Vercel AI SDK middleware, a post-answer quality gate that retries one tier up, a retry rule for empty answers from reasoning models, and a second benchmark with a bolder policy. See [docs/PLAN.md](docs/PLAN.md).
 
