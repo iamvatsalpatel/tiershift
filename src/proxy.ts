@@ -21,6 +21,8 @@ export interface ProxyOptions {
   port?: number;
   /** Max request body in bytes. Default 8 MB. */
   maxBodyBytes?: number;
+  /** Env used to find keys to redact from error bodies. Defaults to process.env. */
+  env?: Record<string, string | undefined>;
 }
 
 export interface ProxyHandle {
@@ -146,6 +148,11 @@ function passthroughParams(body: ChatBody): Record<string, unknown> {
 
 export function createProxy(opts: ProxyOptions): Server {
   const { router } = opts;
+  // Provider errors sometimes echo request headers. Never let a configured key reach a client-visible error body.
+  const env = opts.env ?? process.env;
+  const secrets = [env.TYPESAFE_API_KEY, ...Object.values(router.config.providers).map((pc) => (pc.api_key_env ? env[pc.api_key_env] : undefined))]
+    .filter((s): s is string => typeof s === "string" && s.length >= 8);
+  const redact = (text: string) => secrets.reduce((t, s) => t.split(s).join("[redacted]"), text);
   const maxBody = opts.maxBodyBytes ?? 8 * 1024 * 1024;
   const allModels = new Set(Object.values(router.config.tiers).flat());
   const order = Object.keys(router.config.tiers);
@@ -170,12 +177,19 @@ export function createProxy(opts: ProxyOptions): Server {
     try { logEntry(router.logPath, entry); } catch { /* never let logging affect the response */ }
   }
 
-  function completionRequest(id: string, messages: Message[], tools: ToolDef[] | undefined, body: ChatBody): CompletionRequest {
+  function completionRequest(id: string, messages: Message[], tools: ToolDef[] | undefined, body: ChatBody, decision: Decision | null): CompletionRequest {
+    let maxTokens = body.max_completion_tokens ?? body.max_tokens ?? router.config.defaults?.max_tokens ?? 4096;
+    // Same floor as router.complete(): reasoning models spend output tokens thinking first; a small budget returns an empty answer at full price.
+    const minOut = router.config.defaults?.min_output_tokens ?? 1024;
+    if (router.config.models?.[id]?.caps?.includes("reasoning") && maxTokens < minOut) {
+      decision?.reason.push(`raised max_tokens to ${minOut} for reasoning model ${id}`);
+      maxTokens = minOut;
+    }
     return {
       model: splitModel(id).model,
       messages,
       tools,
-      maxTokens: body.max_completion_tokens ?? body.max_tokens ?? router.config.defaults?.max_tokens ?? 4096,
+      maxTokens,
       temperature: body.temperature ?? router.config.defaults?.temperature,
       // Precedence: the operator's per-model YAML `params` win over the same fields sent by the client.
       // The operator knows provider quirks the client does not, e.g. gpt-5.6-luna needs reasoning_effort none for tools.
@@ -218,7 +232,7 @@ export function createProxy(opts: ProxyOptions): Server {
           throw new HttpError(400, `streaming through the proxy is supported for openai-compatible providers only; "${splitModel(id).provider}" is not one. Send stream: false, or route to an openai-compatible tier.`, "invalid_request_error", "stream_unsupported");
         }
         try {
-          const upstream = await provider.streamRaw(completionRequest(id, messages, tools, body), abort.signal);
+          const upstream = await provider.streamRaw(completionRequest(id, messages, tools, body, decision), abort.signal);
           if (!upstream.body) throw new ProviderError(provider.name, null, "empty stream body");
           res.writeHead(200, {
             "content-type": upstream.headers.get("content-type") ?? "text/event-stream",
@@ -251,7 +265,11 @@ export function createProxy(opts: ProxyOptions): Server {
     for (const id of candidates) {
       const provider = providerFor(id);
       try {
-        const r = await provider.complete(completionRequest(id, messages, tools, body), abort.signal);
+        const r = await provider.complete(completionRequest(id, messages, tools, body, decision), abort.signal);
+        // Same rule as router.complete(): an empty answer that hit the length cap is a failure; try the fallback.
+        if (!r.text.trim() && r.toolCalls.length === 0 && r.finishReason === "length") {
+          throw new ProviderError(provider.name, null, `empty_answer:length (output budget consumed before any answer text; ${r.usage.outputTokens} output tokens billed)`);
+        }
         // Mirror router.complete(): one "complete" entry with actual tokens, cost, and model latency.
         if (decision) writeLog(fromDecision(decision, { kind: "complete", model: id, tier: tierOf(id), fell_back: id !== decision.model, cost_usd: actualCost(router.config.models?.[id], r.usage), input_tokens: r.usage.inputTokens, output_tokens: r.usage.outputTokens, model_latency_ms: r.latencyMs, tag }));
         sendJson(res, 200, toOpenAIResponse(r, id), {
@@ -286,13 +304,13 @@ export function createProxy(opts: ProxyOptions): Server {
     const url = (req.url ?? "/").split("?")[0];
     const done = (fn: Promise<void>) => fn.catch((e: unknown) => {
       if (res.headersSent) { res.end(); return; }
-      if (e instanceof HttpError) return sendError(res, e.status, e.message, e.type, e.code);
+      if (e instanceof HttpError) return sendError(res, e.status, redact(e.message), e.type, e.code);
       if (e instanceof ProviderError) {
         const status = e.status ?? 502;
-        return sendError(res, status >= 400 && status < 600 ? status : 502, e.message, status >= 500 || e.status === null ? "server_error" : "invalid_request_error", "upstream_error");
+        return sendError(res, status >= 400 && status < 600 ? status : 502, redact(e.message), status >= 500 || e.status === null ? "server_error" : "invalid_request_error", "upstream_error");
       }
       const msg = e instanceof Error ? e.message : String(e);
-      return sendError(res, 500, msg, "server_error", "internal");
+      return sendError(res, 500, redact(msg), "server_error", "internal");
     });
     if (req.method === "GET" && url === "/healthz") return sendJson(res, 200, { ok: true });
     if (req.method === "GET" && url === "/v1/models") return handleModels(res);

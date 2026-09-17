@@ -17,7 +17,7 @@ const config: Config = {
 
 const decision: Decision = {
   model: "p/small", provider: "p", tier: "fast", tier_index: 0, requested_tier: "fast", degraded: false, fallback: "q/medium",
-  signals: { difficulty: 0.2, difficulty_confidence: 0.9, needs_reasoning: 0.1, stakes: 0.1, stakes_confidence: 0.9, domain: "general", domain_confidence: 0.9, has_code: 0, ambiguous: 0, output_length: 0, creative: 0, safety_sensitive: 0, trivial_ack: 0 },
+  signals: { difficulty: 0.2, difficulty_confidence: 0.9, needs_reasoning: 0.1, stakes: 0.1, stakes_confidence: 0.9, domain: "general", domain_confidence: 0.9, has_code: 0, ambiguous: 0, output_length: 0, creative: 0, safety_sensitive: 0, trivial_ack: 0, mid_tier_ok: 0.5 },
   code_signals: { est_input_tokens: 10, has_tools: false, tool_count: 0, step: null, retries: 0, turn_count: 1 },
   confidence: 0.9, reason: ['rule "difficulty < 0.5" → fast'], est_cost_usd: 0.00001, est_output_tokens: 50, jev_latency_ms: 150, jev_input_tokens: 900,
 };
@@ -26,8 +26,9 @@ const calls: { provider: string; req: CompletionRequest; stream: boolean }[] = [
 let routeCalls = 0;
 let failSmallWith: ProviderError | null = null;
 
+let smallResultOverride: Partial<CompletionResult> | null = null;
 function fakeProvider(name: string, text: string): Provider {
-  const result = (req: CompletionRequest): CompletionResult => ({ text, toolCalls: [], finishReason: "stop", usage: { inputTokens: 7, outputTokens: 3 }, servedModel: `${req.model}-served`, latencyMs: 12, raw: {} });
+  const result = (req: CompletionRequest): CompletionResult => ({ text, toolCalls: [], finishReason: "stop", usage: { inputTokens: 7, outputTokens: 3 }, servedModel: `${req.model}-served`, latencyMs: 12, raw: {}, ...(name === "p" && smallResultOverride ? smallResultOverride : {}) });
   return {
     name,
     async complete(req) { calls.push({ provider: name, req, stream: false }); if (name === "p" && failSmallWith) throw failSmallWith; return result(req); },
@@ -180,5 +181,45 @@ describe("proxy", () => {
     const res = await post({ model: "q/medium", messages: [{ role: "user", content: "x" }] });
     expect(res.status).toBe(200);
     expect(readLogLines()).toHaveLength(0);
+  });
+});
+
+describe("proxy safeguards shared with router.complete()", () => {
+  it("raises max_tokens to the min_output_tokens floor for a reasoning-capable model", async () => {
+    calls.length = 0;
+    const withCap = { ...config, models: { ...(config.models ?? {}), "p/small": { ...(config.models?.["p/small"] ?? {}), caps: ["reasoning"] } }, defaults: { ...(config.defaults ?? {}), min_output_tokens: 1024 } };
+    const h2 = await startProxy({ router: { ...router, config: withCap }, port: 0 });
+    try {
+      const r = await fetch(`${h2.url}/v1/chat/completions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: "auto", messages: [{ role: "user", content: "hi" }], max_tokens: 16 }) });
+      expect(r.status).toBe(200);
+      expect(calls.at(-1)?.req.maxTokens).toBe(1024);
+      expect(r.headers.get("x-tiershift-reason")).toContain("raised max_tokens to 1024");
+    } finally { await h2.close(); }
+  });
+
+  it("treats an empty answer that hit the length cap as a failure and falls back", async () => {
+    calls.length = 0; smallResultOverride = { text: "", finishReason: "length", usage: { inputTokens: 7, outputTokens: 16 } };
+    try {
+      const r = await post({ model: "auto", messages: [{ role: "user", content: "hi" }] });
+      expect(r.status).toBe(200);
+      expect(r.headers.get("x-tiershift-fell-back")).toBe("true");
+      expect(((await r.json()) as any).choices[0].message.content).toBe("medium says hi");
+      expect(calls.map((c) => c.provider)).toEqual(["p", "q"]);
+    } finally { smallResultOverride = null; }
+  });
+
+  it("never echoes a configured key in an error body", async () => {
+    calls.length = 0;
+    const SECRET = "sk-test-SUPERSECRET-0123456789";
+    const cfg = { ...config, providers: { ...config.providers, p: { type: "openai-compatible" as const, api_key_env: "P_KEY" } } };
+    const h2 = await startProxy({ router: { ...router, config: cfg }, port: 0, env: { P_KEY: SECRET } });
+    failSmallWith = new ProviderError("p", 400, `upstream rejected Authorization: Bearer ${SECRET}`);
+    try {
+      const r = await fetch(`${h2.url}/v1/chat/completions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: "auto", messages: [{ role: "user", content: "hi" }] }) });
+      const text = await r.text();
+      expect(r.status).toBe(400);
+      expect(text).not.toContain(SECRET);
+      expect(text).toContain("[redacted]");
+    } finally { failSmallWith = null; await h2.close(); }
   });
 });
