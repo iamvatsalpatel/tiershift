@@ -190,7 +190,7 @@ fast          33%    39    $0.0017        0.83   146 ms
 mid           28%    34    $0.2036        0.56   129 ms
 flagship      21%    25    $0.8057        0.61   132 ms
 
-total $1.01 (120 of 120 are estimates; no model was called)
+total $1.01 (all 120 are estimates; no model was called)
 always openai/gpt-5.6-sol would cost about $1.22 for the same requests → tiershift saved 17%
 jev: p50 140 ms, p95 350 ms, $0.0049 total
 flags: 24 low-confidence (<0.5)
@@ -285,7 +285,7 @@ Caveats: one judge model from the same family as the flagship arm. Expected tier
 
 ## Status
 
-v0.1.0. Library and CLI work end to end across four tiers. 34 unit tests, no network needed. CI runs on Node 20 and 22. Benchmark harness with cached reruns.
+v0.1.0. Library, CLI, and proxy work end to end across four tiers. 111 unit tests, no network needed. CI runs on Node 20 and 22. Benchmark harness with cached reruns.
 
 Roadmap: Vercel AI SDK middleware, a post-answer quality gate that retries one tier up, a retry rule for empty answers from reasoning models, and a second benchmark with a bolder policy. See [docs/PLAN.md](docs/PLAN.md).
 

@@ -60,7 +60,8 @@ async function main() {
     console.log(`\n${"model".padEnd(34)}${"n".padStart(6)}${"cost".padStart(11)}`);
     for (const m of r.models) console.log(`${m.model.padEnd(34)}${String(m.n).padStart(6)}${usd(m.cost).padStart(11)}`);
     const actual = entries.filter((e) => e.kind === "complete").length;
-    console.log(`\ntotal ${usd(r.total_cost)}${actual < r.n ? ` (${r.n - actual} of ${r.n} are estimates; no model was called)` : ""}`);
+    const est = r.n - actual;
+    console.log(`\ntotal ${usd(r.total_cost)}${est === r.n ? ` (all ${r.n} are estimates; no model was called)` : est > 0 ? ` (${est} of ${r.n} are estimates: route-only or streaming entries)` : ""}`);
     if (r.flagship_model && r.saving_vs_flagship !== null) {
       const top = Object.keys(cfg.tiers).at(-1)!;
       const configuredTop = cfg.tiers[top][0];
