@@ -1,0 +1,34 @@
+name: Sync model metadata
+
+# Pulls prices, context windows, and capabilities from models.dev into prices.yaml once a week.
+# Opens a pull request when anything changed. Nothing merges without a human review.
+on:
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run sync-models -- --write
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore: sync model metadata from models.dev"
+          title: "chore: sync model metadata from models.dev"
+          body: |
+            Weekly automated sync of `prices.yaml` from https://models.dev/api.json.
+
+            Review every price change before merging. DeepSeek lists peak and off-peak rates; models.dev carries the off-peak rate.
+          branch: chore/sync-models
+          delete-branch: true

@@ -43,9 +43,12 @@
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsx src/cli.ts",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
+    "sync-models": "tsx src/cli.ts sync-models"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.126.0",
     "@typesafe-ai/sdk": "^0.6.0",
     "yaml": "^2.9.1"
   },

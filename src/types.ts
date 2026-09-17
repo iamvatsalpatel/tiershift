@@ -54,15 +54,25 @@ export interface CodeSignals {
 }
 
 export interface ModelMeta {
+  /** USD per 1M tokens. */
   price?: { input: number; output: number };
+  /** Context window in tokens. */
   context?: number;
+  /** Max output tokens the model can produce. */
+  max_output?: number;
+  /** Capabilities: tools, json, vision, reasoning. Missing means unknown, and no capability filter runs. */
   caps?: string[];
+  /** Provider-specific request fields merged into every call to this model, e.g. `{ thinking: { type: "disabled" } }`. */
+  params?: Record<string, unknown>;
+  release_date?: string;
 }
 
 export interface ProviderConfig {
   type: "openai-compatible" | "anthropic";
   base_url?: string;
   api_key_env?: string;
+  /** Provider key on models.dev when it differs from this provider's name. `false` disables sync for this provider. */
+  models_dev?: string | false;
 }
 
 export interface Rule {
@@ -85,6 +95,8 @@ export interface Config {
   models?: Record<string, ModelMeta>;
   budget?: { max_cost_per_call?: number; prefer?: "order" | "cheapest" };
   fallback?: "up" | "none";
+  /** Defaults applied to every completion call. */
+  defaults?: { max_tokens?: number; temperature?: number };
   /** When no model at or above the chosen tier has a key, use the best available model below. Default true. */
   degrade?: boolean;
   jev?: { model?: string; timeout_ms?: number };
@@ -110,4 +122,36 @@ export interface Decision {
   est_output_tokens: number;
   jev_latency_ms: number;
   jev_input_tokens: number;
+}
+
+/** Input for `router.complete()`. Same as RouteInput plus call parameters. */
+export interface CompleteInput extends RouteInput {
+  maxTokens?: number;
+  temperature?: number;
+  signal?: AbortSignal;
+}
+
+export interface Attempt {
+  model: string;
+  ok: boolean;
+  latency_ms: number;
+  error?: string;
+  status?: number | null;
+}
+
+export interface CompleteResult {
+  decision: Decision;
+  /** The model that produced the answer. Differs from decision.model when a fallback ran. */
+  model: string;
+  served_model: string;
+  fell_back: boolean;
+  attempts: Attempt[];
+  text: string;
+  tool_calls: { id: string; name: string; arguments: string }[];
+  finish_reason: string;
+  usage: { input_tokens: number; output_tokens: number };
+  /** Actual cost from reported usage and prices.yaml. Null when the price is unknown. */
+  cost_usd: number | null;
+  latency_ms: number;
+  raw: unknown;
 }

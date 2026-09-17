@@ -3,7 +3,10 @@ import { TypeSafeClient } from "@typesafe-ai/sdk";
 import { loadConfig, splitModel } from "./config.js";
 import { applyPolicy, estimateOutputTokens } from "./policy.js";
 import { askJev, codeSignals } from "./signals.js";
-import type { Config, Decision, ModelMeta, RouteInput } from "./types.js";
+import { buildProviders } from "./providers/index.js";
+import type { Provider } from "./providers/index.js";
+import { ProviderError } from "./providers/index.js";
+import type { Attempt, CompleteInput, CompleteResult, Config, Decision, ModelMeta, RouteInput } from "./types.js";
 
 export interface RouterOptions {
   /** Path to tiershift.yaml. Defaults to ./tiershift.yaml, then the bundled default. */
@@ -14,8 +17,12 @@ export interface RouterOptions {
 }
 
 export interface Router {
+  /** Decide only. Returns the model to use, a fallback, every signal, and the reasons. */
   route(input: RouteInput): Promise<Decision>;
+  /** Decide, call the model, and fall back one tier up on failure. */
+  complete(input: CompleteInput): Promise<CompleteResult>;
   config: Config;
+  providers: Record<string, Provider>;
   /** Models whose provider has a usable key, per tier, in preference order. */
   available(): Record<string, string[]>;
 }
@@ -54,6 +61,7 @@ export function createRouter(opts: RouterOptions = {}): Router {
   const config = typeof opts.config === "object" ? opts.config : loadConfig(opts.config);
   const client = new TypeSafeClient({ apiKey: opts.typesafeApiKey ?? env.TYPESAFE_API_KEY, defaultModel: config.jev?.model ?? "jev-latest" });
   const order = Object.keys(config.tiers);
+  const providers = buildProviders(config, env);
 
   const available = () => Object.fromEntries(order.map((t) => [t, config.tiers[t].filter((id) => hasKey(config, splitModel(id).provider, env))]));
 
@@ -112,5 +120,44 @@ export function createRouter(opts: RouterOptions = {}): Router {
     };
   }
 
-  return { route, config, available };
+  function actualCost(meta: ModelMeta | undefined, usage: { inputTokens: number; outputTokens: number }): number | null {
+    if (!meta?.price) return null;
+    return (usage.inputTokens * meta.price.input + usage.outputTokens * meta.price.output) / 1_000_000;
+  }
+
+  async function complete(input: CompleteInput): Promise<CompleteResult> {
+    const decision = await route(input);
+    const candidates = [decision.model, decision.fallback].filter((m): m is string => Boolean(m));
+    const attempts: Attempt[] = [];
+    for (const id of candidates) {
+      const { provider: pname, model } = splitModel(id);
+      const provider = providers[pname];
+      const t0 = performance.now();
+      if (!provider) { attempts.push({ model: id, ok: false, latency_ms: 0, error: `provider "${pname}" has no key` }); continue; }
+      try {
+        const r = await provider.complete({
+          model,
+          messages: input.messages,
+          tools: input.tools,
+          maxTokens: input.maxTokens ?? config.defaults?.max_tokens ?? 4096,
+          temperature: input.temperature ?? config.defaults?.temperature,
+          params: config.models?.[id]?.params,
+        }, input.signal);
+        attempts.push({ model: id, ok: true, latency_ms: r.latencyMs });
+        return {
+          decision, model: id, served_model: r.servedModel, fell_back: id !== decision.model, attempts,
+          text: r.text, tool_calls: r.toolCalls, finish_reason: r.finishReason,
+          usage: { input_tokens: r.usage.inputTokens, output_tokens: r.usage.outputTokens },
+          cost_usd: actualCost(config.models?.[id], r.usage), latency_ms: r.latencyMs, raw: r.raw,
+        };
+      } catch (e) {
+        if (input.signal?.aborted) throw e;
+        const pe = e instanceof ProviderError ? e : null;
+        attempts.push({ model: id, ok: false, latency_ms: Math.round(performance.now() - t0), error: e instanceof Error ? e.message : String(e), status: pe?.status ?? null });
+      }
+    }
+    throw new Error(`tiershift: every candidate failed. ${attempts.map((a) => `${a.model}: ${a.error}`).join(" | ")}`);
+  }
+
+  return { route, complete, config, providers, available };
 }

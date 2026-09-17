@@ -6,3 +6,4 @@ examples/
 *.test.*
 tsconfig.json
 vitest.config.*
+.github/

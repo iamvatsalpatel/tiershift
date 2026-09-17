@@ -7,7 +7,7 @@ import type { Config, ModelMeta } from "./types.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 /** Works from both src/ (tsx) and dist/ (built). */
-const PKG_ROOT = existsSync(join(here, "..", "tiershift.yaml")) ? join(here, "..") : join(here, "..", "..");
+export const PKG_ROOT = existsSync(join(here, "..", "tiershift.yaml")) ? join(here, "..") : join(here, "..", "..");
 
 export function loadPrices(): Record<string, ModelMeta> {
   const p = join(PKG_ROOT, "prices.yaml");
@@ -18,8 +18,15 @@ export function loadConfig(path?: string): Config {
   const file = path ? resolve(path) : existsSync(resolve("tiershift.yaml")) ? resolve("tiershift.yaml") : join(PKG_ROOT, "tiershift.yaml");
   const cfg = parse(readFileSync(file, "utf8")) as Config;
   validate(cfg);
-  cfg.models = { ...loadPrices(), ...(cfg.models ?? {}) };
+  cfg.models = mergeModelMeta(loadPrices(), cfg.models ?? {});
   return cfg;
+}
+
+/** Per-model shallow merge. A config entry that only sets `params` keeps the bundled price and context. */
+export function mergeModelMeta(bundled: Record<string, ModelMeta>, overrides: Record<string, ModelMeta>): Record<string, ModelMeta> {
+  const out: Record<string, ModelMeta> = { ...bundled };
+  for (const [id, meta] of Object.entries(overrides)) out[id] = { ...(bundled[id] ?? {}), ...meta };
+  return out;
 }
 
 export function validate(cfg: Config): void {
