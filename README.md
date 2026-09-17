@@ -58,6 +58,8 @@ npm install tiershift
 export TYPESAFE_API_KEY=...        # get one at typesafe.ai
 ```
 
+**Python:** `uv add tiershift` or `pip install tiershift`, then `from tiershift import create_router`. Same YAML, prices, and log format as the npm package. See [python/README.md](python/README.md).
+
 Provider keys are optional. A tier skips any model whose key is missing. With only [Ollama](https://ollama.com) running, everything routes to the local model and the decision is flagged `degraded: true`.
 
 ## Use

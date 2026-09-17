@@ -17,3 +17,9 @@ __pycache__/
 decisions.jsonl
 .tiershift/
 .claude/worktrees/
+
+# python
+python/.venv/
+python/dist/
+*.egg-info/
+.pytest_cache/

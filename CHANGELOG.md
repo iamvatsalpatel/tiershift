@@ -15,6 +15,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Empty-answer retry: an empty answer with finish reason `length` counts as a failure, so `complete()` moves to the fallback.
 - `tiershift report` shows estimated versus actual cost per tier when both kinds of entries exist.
 - Router, security, and validation test suites. Test count 57 → 92.
+- Python package `tiershift` on PyPI (`python/`): `create_router`, `route`, `complete`, CLI with `route`, `ask`, `check`, `report`, `tune`. Shares the YAML, prices, decision-log format, and conformance fixtures with the npm package, including `mid_tier_ok`, `at_most`, load-time validation, the pinned Jev model, `min_output_tokens`, empty-answer retry, key redaction, and the per-tier estimate check.
 
 ### Changed
 - The Jev model is pinned to `jev-1.13.0` by default instead of `jev-latest`. Routing depends on the model, so upgrades are deliberate.
