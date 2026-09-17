@@ -1,0 +1,605 @@
+{
+  "policy": "policy.yaml",
+  "cases": [
+    {
+      "name": "trivial ack goes local",
+      "signals": {
+        "difficulty": 0.0,
+        "difficulty_confidence": 1.0,
+        "needs_reasoning": 0.0,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.95
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "local",
+      "reason_contains": [
+        "rule \"trivial_ack > 0.8\" \u2192 local"
+      ]
+    },
+    {
+      "name": "easy goes fast",
+      "signals": {
+        "difficulty": 0.2,
+        "difficulty_confidence": 1.0,
+        "needs_reasoning": 0.0,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "fast",
+      "reason_contains": []
+    },
+    {
+      "name": "boundary 0.5 is mid, not fast",
+      "signals": {
+        "difficulty": 0.5,
+        "difficulty_confidence": 1.0,
+        "needs_reasoning": 0.0,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "mid",
+      "reason_contains": []
+    },
+    {
+      "name": "moderate goes mid",
+      "signals": {
+        "difficulty": 0.9,
+        "difficulty_confidence": 1.0,
+        "needs_reasoning": 0.0,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "mid",
+      "reason_contains": []
+    },
+    {
+      "name": "boundary 1.3 is flagship",
+      "signals": {
+        "difficulty": 1.3,
+        "difficulty_confidence": 1.0,
+        "needs_reasoning": 0.0,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "flagship",
+      "reason_contains": [
+        "default \u2192 flagship"
+      ]
+    },
+    {
+      "name": "hard goes flagship",
+      "signals": {
+        "difficulty": 1.9,
+        "difficulty_confidence": 1.0,
+        "needs_reasoning": 0.0,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "flagship",
+      "reason_contains": []
+    },
+    {
+      "name": "high stakes lifts easy to flagship",
+      "signals": {
+        "difficulty": 0.1,
+        "difficulty_confidence": 1.0,
+        "needs_reasoning": 0.0,
+        "stakes": 1.9,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "flagship",
+      "reason_contains": [
+        "override \"stakes > 1.5\" \u2192 at_least flagship"
+      ]
+    },
+    {
+      "name": "stakes exactly 1.5 does not fire",
+      "signals": {
+        "difficulty": 0.1,
+        "difficulty_confidence": 1.0,
+        "needs_reasoning": 0.0,
+        "stakes": 1.5,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "fast",
+      "reason_contains": []
+    },
+    {
+      "name": "safety lifts to flagship",
+      "signals": {
+        "difficulty": 0.3,
+        "difficulty_confidence": 1.0,
+        "needs_reasoning": 0.0,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.9,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "flagship",
+      "reason_contains": []
+    },
+    {
+      "name": "reasoning lifts fast to mid",
+      "signals": {
+        "difficulty": 0.3,
+        "difficulty_confidence": 1.0,
+        "needs_reasoning": 0.95,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "mid",
+      "reason_contains": []
+    },
+    {
+      "name": "reasoning does not lower flagship",
+      "signals": {
+        "difficulty": 1.8,
+        "difficulty_confidence": 1.0,
+        "needs_reasoning": 0.95,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "flagship",
+      "reason_contains": []
+    },
+    {
+      "name": "tools lift local to fast",
+      "signals": {
+        "difficulty": 0.0,
+        "difficulty_confidence": 1.0,
+        "needs_reasoning": 0.0,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.95
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": true,
+        "tool_count": 2,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "fast",
+      "reason_contains": [
+        "override \"has_tools and tier == local\" \u2192 at_least fast"
+      ]
+    },
+    {
+      "name": "tools do not touch mid",
+      "signals": {
+        "difficulty": 0.9,
+        "difficulty_confidence": 1.0,
+        "needs_reasoning": 0.0,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": true,
+        "tool_count": 1,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "mid",
+      "reason_contains": []
+    },
+    {
+      "name": "low confidence moves up one",
+      "signals": {
+        "difficulty": 0.3,
+        "difficulty_confidence": 0.4,
+        "needs_reasoning": 0.0,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "mid",
+      "reason_contains": [
+        "override \"difficulty_confidence < 0.5\" \u2192 up 1 \u2192 mid"
+      ]
+    },
+    {
+      "name": "retry moves up one",
+      "signals": {
+        "difficulty": 0.3,
+        "difficulty_confidence": 1.0,
+        "needs_reasoning": 0.0,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 1,
+        "turn_count": 1
+      },
+      "expected_tier": "mid",
+      "reason_contains": []
+    },
+    {
+      "name": "low confidence and retry stack",
+      "signals": {
+        "difficulty": 0.3,
+        "difficulty_confidence": 0.4,
+        "needs_reasoning": 0.0,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 1,
+        "turn_count": 1
+      },
+      "expected_tier": "flagship",
+      "reason_contains": []
+    },
+    {
+      "name": "up caps at top tier",
+      "signals": {
+        "difficulty": 1.9,
+        "difficulty_confidence": 0.1,
+        "needs_reasoning": 0.0,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 3,
+        "turn_count": 1
+      },
+      "expected_tier": "flagship",
+      "reason_contains": []
+    },
+    {
+      "name": "string equality on domain",
+      "signals": {
+        "difficulty": 0.2,
+        "difficulty_confidence": 1.0,
+        "needs_reasoning": 0.0,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "legal_finance",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "mid",
+      "reason_contains": [
+        "at_least mid"
+      ]
+    },
+    {
+      "name": "quoted string equality on domain",
+      "signals": {
+        "difficulty": 0.2,
+        "difficulty_confidence": 1.0,
+        "needs_reasoning": 0.0,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "medical",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "mid",
+      "reason_contains": []
+    },
+    {
+      "name": "or clause: neither domain matches",
+      "signals": {
+        "difficulty": 0.2,
+        "difficulty_confidence": 1.0,
+        "needs_reasoning": 0.0,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "code",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "fast",
+      "reason_contains": []
+    },
+    {
+      "name": "overrides apply in order: floor then up",
+      "signals": {
+        "difficulty": 0.2,
+        "difficulty_confidence": 0.3,
+        "needs_reasoning": 0.9,
+        "stakes": 0.0,
+        "stakes_confidence": 1.0,
+        "domain": "general",
+        "domain_confidence": 1.0,
+        "has_code": 0.0,
+        "ambiguous": 0.0,
+        "output_length": 0.0,
+        "creative": 0.0,
+        "safety_sensitive": 0.0,
+        "trivial_ack": 0.0
+      },
+      "code_signals": {
+        "est_input_tokens": 100,
+        "has_tools": false,
+        "tool_count": 0,
+        "step": null,
+        "retries": 0,
+        "turn_count": 1
+      },
+      "expected_tier": "flagship",
+      "reason_contains": []
+    }
+  ]
+}
