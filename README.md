@@ -174,13 +174,35 @@ tiershift sync-models [--write]        # refresh prices.yaml from models.dev
 
 Add `--json` for the full object and `--config path` for a custom policy.
 
+## Benchmark
+
+120 prompts in four categories (acknowledgements, simple, moderate, hard), three arms, one blind judge. Full method and every raw record in [bench/](bench/).
+
+![Quality against cost, three arms](bench/chart-light.svg)
+
+| Arm | Mean quality (1 to 5) | Cost per 1,000 prompts | p50 latency |
+|---|---|---|---|
+| Always flagship (gpt-5.6-sol) | 4.83 | $13.23 | 1.9 s |
+| **tiershift** | **4.78** | **$12.34** | 2.0 s |
+| Always fast (deepseek-flash) | 4.49 | $0.37 | 1.4 s |
+
+**The honest read.** On this mix, tiershift kept 99 percent of flagship quality and saved 7 percent. The saving is small because a quarter of the prompts were hard, hard prompts cost about 100 times more than acknowledgements, and tiershift sent 24 of the 30 hard prompts to the flagship at full price. It saved 82 percent on acknowledgements and 25 percent on moderate prompts. Savings scale with the share of easy traffic:
+
+| Traffic mix (ack / simple / moderate / hard) | tiershift saving | Quality kept |
+|---|---|---|
+| This benchmark (25 / 25 / 25 / 25) | 7% | 99% |
+| Coding agent, illustrative (40 / 20 / 30 / 10) | 11% | 99% |
+| Support assistant, illustrative (30 / 50 / 20 / 0) | 40% | 99% |
+
+Routing agreed with the author's expected tier on 86 percent of prompts. The Jev call added a median 199 ms and $0.04 per 1,000 routes. One finding worth acting on: the mid-tier model scored higher than the flagship on the six hard prompts it received, at a quarter of the cost. The default policy is conservative on purpose. Tune `difficulty` thresholds against your own traffic.
+
+Caveats: one judge model from the same family as the flagship arm. Expected tiers are author labels. The flagship model returned four empty answers when reasoning consumed the whole 4,096-token budget, and both arms that used it paid for those. Details in [bench/results.md](bench/results.md).
+
 ## Status
 
-v0.1.0. Library and CLI work end to end across four tiers. 23 unit tests, no network needed. CI runs on Node 20 and 22.
+v0.1.0. Library and CLI work end to end across four tiers. 25 unit tests, no network needed. CI runs on Node 20 and 22. Benchmark harness with cached reruns.
 
-Probe on 12 prompts: easy prompts scored 0.00 to 0.09 on difficulty, hard prompts 1.19 to 2.00. Median Jev latency 278 ms.
-
-Roadmap: OpenAI-compatible proxy with `model: "auto"`, Vercel AI SDK middleware, a post-answer quality gate that retries one tier up, and a published benchmark with quality versus cost across three arms. See [docs/PLAN.md](docs/PLAN.md).
+Roadmap: OpenAI-compatible proxy with `model: "auto"`, Vercel AI SDK middleware, a post-answer quality gate that retries one tier up, a retry rule for empty answers from reasoning models, and a second benchmark with a bolder policy. See [docs/PLAN.md](docs/PLAN.md).
 
 ## License
 

@@ -1,0 +1,8 @@
+{
+  "flagship": "openai/gpt-5.6-sol",
+  "fast": "deepseek/deepseek-flash",
+  "judge": "openai/gpt-5.6-sol",
+  "max_tokens": 4096,
+  "date": "2026-09-17",
+  "prompts": 120
+}

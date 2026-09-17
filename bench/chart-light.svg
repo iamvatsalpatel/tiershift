@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="440" viewBox="0 0 760 440" role="img" aria-labelledby="t d" font-family='-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'>
+<title id="t">Quality against cost, three arms</title>
+<desc id="d">Always flagship: quality 4.83, $13.2 per 1,000 prompts. Always fast: quality 4.49, $0.37 per 1,000 prompts. tiershift: quality 4.78, $12.3 per 1,000 prompts.</desc>
+<rect width="760" height="440" fill="#fcfcfb"/>
+<text x="64" y="34" fill="#0b0b0b" font-size="17" font-weight="600">Same 120 prompts. Same judge. Three ways to pick a model.</text>
+<text x="64" y="56" fill="#52514e" font-size="12.5">Mean quality 1 to 5, judged blind by gpt-5.6-sol · cost per 1,000 prompts, log scale · 2026-09-17</text>
+<line x1="64" x2="540" y1="376" y2="376" stroke="#e1e0d9" stroke-width="1"/>
+<text x="54" y="380" fill="#898781" font-size="11.5" text-anchor="end">1</text>
+<line x1="64" x2="540" y1="303" y2="303" stroke="#e1e0d9" stroke-width="1"/>
+<text x="54" y="307" fill="#898781" font-size="11.5" text-anchor="end">2</text>
+<line x1="64" x2="540" y1="230" y2="230" stroke="#e1e0d9" stroke-width="1"/>
+<text x="54" y="234" fill="#898781" font-size="11.5" text-anchor="end">3</text>
+<line x1="64" x2="540" y1="157" y2="157" stroke="#e1e0d9" stroke-width="1"/>
+<text x="54" y="161" fill="#898781" font-size="11.5" text-anchor="end">4</text>
+<line x1="64" x2="540" y1="84" y2="84" stroke="#e1e0d9" stroke-width="1"/>
+<text x="54" y="88" fill="#898781" font-size="11.5" text-anchor="end">5</text>
+<line x1="64" x2="64" y1="84" y2="376" stroke="#e1e0d9" stroke-width="1"/>
+<text x="64" y="396" fill="#898781" font-size="11.5" text-anchor="middle">$0.1</text>
+<line x1="222.66666666666666" x2="222.66666666666666" y1="84" y2="376" stroke="#e1e0d9" stroke-width="1"/>
+<text x="222.66666666666666" y="396" fill="#898781" font-size="11.5" text-anchor="middle">$1</text>
+<line x1="381.3333333333333" x2="381.3333333333333" y1="84" y2="376" stroke="#e1e0d9" stroke-width="1"/>
+<text x="381.3333333333333" y="396" fill="#898781" font-size="11.5" text-anchor="middle">$10</text>
+<line x1="540" x2="540" y1="84" y2="376" stroke="#e1e0d9" stroke-width="1"/>
+<text x="540" y="396" fill="#898781" font-size="11.5" text-anchor="middle">$100</text>
+<line x1="64" x2="540" y1="376" y2="376" stroke="#c3c2b7" stroke-width="1"/>
+<text x="302" y="418" fill="#898781" font-size="11.5" text-anchor="middle">Cost per 1,000 prompts (USD, log scale)</text>
+<text transform="translate(18 230) rotate(-90)" fill="#898781" font-size="11.5" text-anchor="middle">Mean quality (1 to 5)</text>
+<circle cx="400.605375084121" cy="96.77499999999998" r="8" fill="#fcfcfb"/>
+<circle cx="400.605375084121" cy="96.77499999999998" r="6" fill="#898781"/>
+<circle cx="154.58215779705742" cy="121.10833333333338" r="8" fill="#fcfcfb"/>
+<circle cx="154.58215779705742" cy="121.10833333333338" r="6" fill="#898781"/>
+<circle cx="395.7938900674046" cy="99.81666666666666" r="8" fill="#fcfcfb"/>
+<circle cx="395.7938900674046" cy="99.81666666666666" r="6" fill="#2a78d6"/>
+<text x="414.605375084121" y="96.77499999999998" fill="#0b0b0b" font-size="13" font-weight="500" text-anchor="start">Always flagship</text>
+<text x="414.605375084121" y="112.77499999999998" fill="#52514e" font-size="11.5" text-anchor="start">quality 4.83 · $13.2 per 1k</text>
+<line x1="403.7938900674046" y1="99.81666666666666" x2="406.7938900674046" y2="126.77499999999998" stroke="#c3c2b7" stroke-width="1"/>
+<text x="409.7938900674046" y="130.77499999999998" fill="#0b0b0b" font-size="13" font-weight="600" text-anchor="start">tiershift</text>
+<text x="409.7938900674046" y="146.77499999999998" fill="#52514e" font-size="11.5" text-anchor="start">quality 4.78 · $12.3 per 1k</text>
+<text x="168.58215779705742" y="121.10833333333338" fill="#0b0b0b" font-size="13" font-weight="500" text-anchor="start">Always fast</text>
+<text x="168.58215779705742" y="137.10833333333338" fill="#52514e" font-size="11.5" text-anchor="start">quality 4.49 · $0.37 per 1k</text>
+<text x="736" y="418" fill="#52514e" font-size="11.5" text-anchor="end">tiershift: 99.1% of flagship quality at 93% of the cost</text>
+</svg>

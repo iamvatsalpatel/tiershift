@@ -43,9 +43,13 @@
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsx src/cli.ts",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.bench.json",
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
-    "sync-models": "tsx src/cli.ts sync-models"
+    "sync-models": "tsx src/cli.ts sync-models",
+    "bench": "tsx bench/run.ts",
+    "bench:smoke": "tsx bench/run.ts --smoke",
+    "bench:report": "tsx bench/report.ts",
+    "bench:chart": "tsx bench/chart.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.126.0",

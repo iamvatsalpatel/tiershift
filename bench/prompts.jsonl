@@ -1,0 +1,120 @@
+{"id": "ack-01", "category": "ack", "expected_tier": "local", "prompt": "ok thanks"}
+{"id": "ack-02", "category": "ack", "expected_tier": "local", "prompt": "got it"}
+{"id": "ack-03", "category": "ack", "expected_tier": "local", "prompt": "sounds good, go ahead"}
+{"id": "ack-04", "category": "ack", "expected_tier": "local", "prompt": "yes"}
+{"id": "ack-05", "category": "ack", "expected_tier": "local", "prompt": "no, cancel that"}
+{"id": "ack-06", "category": "ack", "expected_tier": "local", "prompt": "thanks, that's all for now"}
+{"id": "ack-07", "category": "ack", "expected_tier": "local", "prompt": "Reply with exactly: DONE"}
+{"id": "ack-08", "category": "ack", "expected_tier": "local", "prompt": "Acknowledge that you received the file."}
+{"id": "ack-09", "category": "ack", "expected_tier": "local", "prompt": "Confirm you understood the plan in one word."}
+{"id": "ack-10", "category": "ack", "expected_tier": "local", "prompt": "Say hello."}
+{"id": "ack-11", "category": "ack", "expected_tier": "local", "prompt": "Please repeat back the word: pineapple"}
+{"id": "ack-12", "category": "ack", "expected_tier": "local", "prompt": "Respond with the number 7."}
+{"id": "ack-13", "category": "ack", "expected_tier": "local", "prompt": "Okay, continue."}
+{"id": "ack-14", "category": "ack", "expected_tier": "local", "prompt": "Understood. Proceed with step 2."}
+{"id": "ack-15", "category": "ack", "expected_tier": "local", "prompt": "Great, thanks!"}
+{"id": "ack-16", "category": "ack", "expected_tier": "local", "prompt": "Format this as a bullet list: apples, oranges, pears"}
+{"id": "ack-17", "category": "ack", "expected_tier": "local", "prompt": "Convert to uppercase: hello world"}
+{"id": "ack-18", "category": "ack", "expected_tier": "local", "prompt": "Put these in alphabetical order: zebra, apple, mango"}
+{"id": "ack-19", "category": "ack", "expected_tier": "local", "prompt": "Add a period to the end of this sentence: The build passed"}
+{"id": "ack-20", "category": "ack", "expected_tier": "local", "prompt": "Wrap this in quotes: ready"}
+{"id": "ack-21", "category": "ack", "expected_tier": "local", "prompt": "Reply with a thumbs up emoji."}
+{"id": "ack-22", "category": "ack", "expected_tier": "local", "prompt": "Yes, that's correct."}
+{"id": "ack-23", "category": "ack", "expected_tier": "local", "prompt": "Nope, all set."}
+{"id": "ack-24", "category": "ack", "expected_tier": "local", "prompt": "Return the JSON {\"ok\": true} and nothing else."}
+{"id": "ack-25", "category": "ack", "expected_tier": "local", "prompt": "Trim the whitespace from:    padded   "}
+{"id": "ack-26", "category": "ack", "expected_tier": "local", "prompt": "Echo this back: build-1234"}
+{"id": "ack-27", "category": "ack", "expected_tier": "local", "prompt": "Capitalize the first letter: monday"}
+{"id": "ack-28", "category": "ack", "expected_tier": "local", "prompt": "Join these with commas: red green blue"}
+{"id": "ack-29", "category": "ack", "expected_tier": "local", "prompt": "Reverse this list: 1, 2, 3"}
+{"id": "ack-30", "category": "ack", "expected_tier": "local", "prompt": "Acknowledged?"}
+{"id": "simple-01", "category": "simple", "expected_tier": "fast", "prompt": "What is the capital of Australia?"}
+{"id": "simple-02", "category": "simple", "expected_tier": "fast", "prompt": "Convert 100 Fahrenheit to Celsius."}
+{"id": "simple-03", "category": "simple", "expected_tier": "fast", "prompt": "How many days are in a leap year?"}
+{"id": "simple-04", "category": "simple", "expected_tier": "fast", "prompt": "What does HTTP status 404 mean?"}
+{"id": "simple-05", "category": "simple", "expected_tier": "fast", "prompt": "Rewrite in a formal tone: hey ur order is late sorry, ships tmrw"}
+{"id": "simple-06", "category": "simple", "expected_tier": "fast", "prompt": "Give me a synonym for 'quick'."}
+{"id": "simple-07", "category": "simple", "expected_tier": "fast", "prompt": "What is the plural of 'cactus'?"}
+{"id": "simple-08", "category": "simple", "expected_tier": "fast", "prompt": "Translate to Spanish: Where is the train station?"}
+{"id": "simple-09", "category": "simple", "expected_tier": "fast", "prompt": "Summarize in one sentence: The meeting moved from 3pm to 4pm on Thursday because the room was double-booked."}
+{"id": "simple-10", "category": "simple", "expected_tier": "fast", "prompt": "What year did the first iPhone launch?"}
+{"id": "simple-11", "category": "simple", "expected_tier": "fast", "prompt": "Is 17 a prime number?"}
+{"id": "simple-12", "category": "simple", "expected_tier": "fast", "prompt": "What is the chemical symbol for gold?"}
+{"id": "simple-13", "category": "simple", "expected_tier": "fast", "prompt": "Name three primary colors."}
+{"id": "simple-14", "category": "simple", "expected_tier": "fast", "prompt": "What does the git command 'git stash' do, in one sentence?"}
+{"id": "simple-15", "category": "simple", "expected_tier": "fast", "prompt": "Fix the typo: I recieved the package."}
+{"id": "simple-16", "category": "simple", "expected_tier": "fast", "prompt": "What is 15 percent of 80?"}
+{"id": "simple-17", "category": "simple", "expected_tier": "fast", "prompt": "Which is larger, 0.7 or 0.65?"}
+{"id": "simple-18", "category": "simple", "expected_tier": "fast", "prompt": "Write a one-line commit message for: fixed null check in login handler"}
+{"id": "simple-19", "category": "simple", "expected_tier": "fast", "prompt": "What time zone is London in during winter?"}
+{"id": "simple-20", "category": "simple", "expected_tier": "fast", "prompt": "Define 'idempotent' in one sentence."}
+{"id": "simple-21", "category": "simple", "expected_tier": "fast", "prompt": "What is the boiling point of water in Kelvin?"}
+{"id": "simple-22", "category": "simple", "expected_tier": "fast", "prompt": "Turn this into a question: The server is running."}
+{"id": "simple-23", "category": "simple", "expected_tier": "fast", "prompt": "Give one example of a NoSQL database."}
+{"id": "simple-24", "category": "simple", "expected_tier": "fast", "prompt": "What does CSS stand for?"}
+{"id": "simple-25", "category": "simple", "expected_tier": "fast", "prompt": "Shorten to under 10 words: We are writing to inform you that your subscription will renew automatically next month."}
+{"id": "simple-26", "category": "simple", "expected_tier": "fast", "prompt": "Which planet is closest to the sun?"}
+{"id": "simple-27", "category": "simple", "expected_tier": "fast", "prompt": "Convert 5 kilometers to miles."}
+{"id": "simple-28", "category": "simple", "expected_tier": "fast", "prompt": "What is the past tense of 'swim'?"}
+{"id": "simple-29", "category": "simple", "expected_tier": "fast", "prompt": "List the days of the week starting from Wednesday."}
+{"id": "simple-30", "category": "simple", "expected_tier": "fast", "prompt": "Explain what a URL is to a 10-year-old in one sentence."}
+{"id": "moderate-01", "category": "moderate", "expected_tier": "mid", "prompt": "Write a Python function that parses ISO 8601 date strings and returns a timezone-aware UTC datetime. Include two test cases."}
+{"id": "moderate-02", "category": "moderate", "expected_tier": "mid", "prompt": "Explain the difference between optimistic and pessimistic locking with a short example of each."}
+{"id": "moderate-03", "category": "moderate", "expected_tier": "mid", "prompt": "Given this stack trace, find the likely bug: TypeError: Cannot read properties of undefined (reading 'map') at render (App.tsx:42)"}
+{"id": "moderate-04", "category": "moderate", "expected_tier": "mid", "prompt": "Write a SQL query that returns the top 3 customers by total order value in 2025 from tables customers(id, name) and orders(id, customer_id, amount, created_at)."}
+{"id": "moderate-05", "category": "moderate", "expected_tier": "mid", "prompt": "Explain what a race condition is and give one way to prevent it in Go."}
+{"id": "moderate-06", "category": "moderate", "expected_tier": "mid", "prompt": "Write a regular expression that matches US phone numbers in the formats (555) 123-4567 and 555-123-4567. Explain each part."}
+{"id": "moderate-07", "category": "moderate", "expected_tier": "mid", "prompt": "Refactor this to avoid the nested callbacks: fs.readFile('a', (e, a) => { fs.readFile('b', (e, b) => { console.log(a + b) }) })"}
+{"id": "moderate-08", "category": "moderate", "expected_tier": "mid", "prompt": "Compare REST and GraphQL in five bullet points for a team choosing an API style."}
+{"id": "moderate-09", "category": "moderate", "expected_tier": "mid", "prompt": "Write a bash one-liner that finds the 10 largest files under the current directory."}
+{"id": "moderate-10", "category": "moderate", "expected_tier": "mid", "prompt": "Explain how a hash map handles collisions. Name two strategies."}
+{"id": "moderate-11", "category": "moderate", "expected_tier": "mid", "prompt": "Write a TypeScript type guard that checks whether an unknown value is a non-empty string array."}
+{"id": "moderate-12", "category": "moderate", "expected_tier": "mid", "prompt": "What is the time complexity of binary search and why? Give a short proof sketch."}
+{"id": "moderate-13", "category": "moderate", "expected_tier": "mid", "prompt": "Draft a polite email to a vendor asking for a revised invoice because the tax rate applied was 8% instead of 6%."}
+{"id": "moderate-14", "category": "moderate", "expected_tier": "mid", "prompt": "Explain the CAP theorem in plain English with one example system for each trade-off."}
+{"id": "moderate-15", "category": "moderate", "expected_tier": "mid", "prompt": "Write a Python generator that yields Fibonacci numbers below a given limit."}
+{"id": "moderate-16", "category": "moderate", "expected_tier": "mid", "prompt": "Debug: my Docker container exits immediately with code 0 when I run it. What are the three most likely causes?"}
+{"id": "moderate-17", "category": "moderate", "expected_tier": "mid", "prompt": "Write a unit test in Jest for a function add(a, b) that covers positive, negative, and floating point inputs."}
+{"id": "moderate-18", "category": "moderate", "expected_tier": "mid", "prompt": "Explain the difference between a process and a thread in two short paragraphs."}
+{"id": "moderate-19", "category": "moderate", "expected_tier": "mid", "prompt": "Write a JSON Schema for an object with required fields name (string), age (integer >= 0), and optional email (string, email format)."}
+{"id": "moderate-20", "category": "moderate", "expected_tier": "mid", "prompt": "Convert this Python 2 code to Python 3: print 'total: %d' % total"}
+{"id": "moderate-21", "category": "moderate", "expected_tier": "mid", "prompt": "Explain what CORS is and why a browser blocks a request from localhost:3000 to api.example.com."}
+{"id": "moderate-22", "category": "moderate", "expected_tier": "mid", "prompt": "Write a Go function that reverses a UTF-8 string correctly, handling multi-byte runes."}
+{"id": "moderate-23", "category": "moderate", "expected_tier": "mid", "prompt": "Give a short explanation of database indexing and one case where an index hurts performance."}
+{"id": "moderate-24", "category": "moderate", "expected_tier": "mid", "prompt": "Write a Dockerfile for a Node 20 app that installs dependencies with npm ci and runs npm start."}
+{"id": "moderate-25", "category": "moderate", "expected_tier": "mid", "prompt": "Explain the difference between == and === in JavaScript with two examples where they differ."}
+{"id": "moderate-26", "category": "moderate", "expected_tier": "mid", "prompt": "Write a Python script that reads a CSV file and prints the average of the 'price' column, skipping blank rows."}
+{"id": "moderate-27", "category": "moderate", "expected_tier": "mid", "prompt": "My React component re-renders on every keystroke. List four common causes and one fix for each."}
+{"id": "moderate-28", "category": "moderate", "expected_tier": "mid", "prompt": "Explain what a JWT is, what its three parts are, and one security mistake people make with them."}
+{"id": "moderate-29", "category": "moderate", "expected_tier": "mid", "prompt": "Write a recursive function in JavaScript that deep-clones a plain object, handling arrays and nested objects."}
+{"id": "moderate-30", "category": "moderate", "expected_tier": "mid", "prompt": "Explain idempotency keys in payment APIs and sketch how a server should store and check them."}
+{"id": "hard-01", "category": "hard", "expected_tier": "flagship", "prompt": "Design a multi-region active-active database architecture for a payments system. Cover conflict resolution, consistency guarantees, and the CAP trade-offs. Explain what you would give up and why."}
+{"id": "hard-02", "category": "hard", "expected_tier": "flagship", "prompt": "Prove that the halting problem is undecidable, then explain how Rice's theorem generalizes the result."}
+{"id": "hard-03", "category": "hard", "expected_tier": "flagship", "prompt": "Review this indemnification clause for risk and propose specific redlines: 'Vendor shall indemnify Client against all claims arising from any cause whatsoever.'"}
+{"id": "hard-04", "category": "hard", "expected_tier": "flagship", "prompt": "Plan a 12-step zero-downtime migration of a 2-million-line Java monolith to microservices. Include a rollback strategy for each step and the order in which you would extract services."}
+{"id": "hard-05", "category": "hard", "expected_tier": "flagship", "prompt": "A startup has $2M runway, 18 months, 12 engineers, and a churn rate of 6% monthly. Build a decision framework for whether to cut burn, raise a bridge, or pivot. State your assumptions and the break-even math."}
+{"id": "hard-06", "category": "hard", "expected_tier": "flagship", "prompt": "Design a rate limiter for a public API serving 50,000 requests per second across 20 servers. Compare token bucket, sliding window, and fixed window. Choose one and explain the failure modes under a network partition."}
+{"id": "hard-07", "category": "hard", "expected_tier": "flagship", "prompt": "Analyze the security of this scheme: a server issues a 6-digit OTP, valid 10 minutes, and allows unlimited attempts. Quantify the attack, then propose a design that is robust against brute force and phishing."}
+{"id": "hard-08", "category": "hard", "expected_tier": "flagship", "prompt": "Derive the expected number of comparisons for quicksort on n distinct elements with random pivots. Show the recurrence and solve it."}
+{"id": "hard-09", "category": "hard", "expected_tier": "flagship", "prompt": "You are the on-call architect. A Kafka consumer group is lagging by 40 million messages and growing. Give a diagnosis tree, the order of checks, and the trade-offs of each remediation."}
+{"id": "hard-10", "category": "hard", "expected_tier": "flagship", "prompt": "Compare three consensus algorithms, Raft, Paxos, and PBFT, for a permissioned ledger with 7 nodes where one node may be malicious. Recommend one with justification."}
+{"id": "hard-11", "category": "hard", "expected_tier": "flagship", "prompt": "Write a tax-efficient strategy memo for a US employee with $400k in vested RSUs, an 83(b) election missed, and a planned move from California to Texas in Q4. Identify the key deadlines and risks. Note this is not legal advice."}
+{"id": "hard-12", "category": "hard", "expected_tier": "flagship", "prompt": "Explain, with equations, why gradient descent with a learning rate above 2/L diverges on an L-smooth convex function, and what momentum changes about that bound."}
+{"id": "hard-13", "category": "hard", "expected_tier": "flagship", "prompt": "Design the data model and API for a collaborative document editor supporting offline edits from 50 users. Choose between OT and CRDTs and defend the choice with concrete conflict examples."}
+{"id": "hard-14", "category": "hard", "expected_tier": "flagship", "prompt": "A hospital wants to deploy an LLM triage assistant in the emergency department. Write a risk assessment covering failure modes, liability, monitoring, and the human-in-the-loop design that would make it acceptable."}
+{"id": "hard-15", "category": "hard", "expected_tier": "flagship", "prompt": "Given a codebase with 3,000 flaky tests out of 40,000, propose a quantitative strategy to reach a 99.9% green main branch in 90 days. Include how you would measure flakiness and prioritize fixes."}
+{"id": "hard-16", "category": "hard", "expected_tier": "flagship", "prompt": "Prove that there are infinitely many primes of the form 4k+3."}
+{"id": "hard-17", "category": "hard", "expected_tier": "flagship", "prompt": "Design a fraud detection pipeline for a marketplace processing 10 million transactions per day with a 0.1% fraud rate. Address class imbalance, labeling delay, feature leakage, and how you would set the decision threshold against business costs."}
+{"id": "hard-18", "category": "hard", "expected_tier": "flagship", "prompt": "Critique this architecture: a single PostgreSQL primary with 12 read replicas, application-level sharding by customer ID, and a nightly ETL to a data warehouse. Identify the three biggest risks and propose a migration path."}
+{"id": "hard-19", "category": "hard", "expected_tier": "flagship", "prompt": "An airline overbooks flights. Build a model that chooses how many extra seats to sell given a no-show distribution, a bump cost, and a ticket price. Derive the optimal overbooking level."}
+{"id": "hard-20", "category": "hard", "expected_tier": "flagship", "prompt": "Write a threat model for a browser extension that reads page content to summarize it. Cover the extension permissions, data flow, supply chain, and what a malicious update could do."}
+{"id": "hard-21", "category": "hard", "expected_tier": "flagship", "prompt": "Design a schema and query plan for time-series metrics at 5 million points per second with 30-day retention and sub-second p99 dashboard queries. Compare a columnar store, a purpose-built TSDB, and PostgreSQL with TimescaleDB."}
+{"id": "hard-22", "category": "hard", "expected_tier": "flagship", "prompt": "Explain how Byzantine fault tolerance differs from crash fault tolerance, and derive the minimum number of nodes needed to tolerate f faulty nodes in each case."}
+{"id": "hard-23", "category": "hard", "expected_tier": "flagship", "prompt": "A SaaS company's gross margin dropped from 78% to 64% in two quarters. Build a diagnostic plan: which metrics to pull, which hypotheses to test first, and how to distinguish infrastructure cost growth from pricing erosion."}
+{"id": "hard-24", "category": "hard", "expected_tier": "flagship", "prompt": "Design an experiment to test whether a new recommendation algorithm improves 30-day retention, with a power analysis, guardrail metrics, and a plan for handling network effects between users."}
+{"id": "hard-25", "category": "hard", "expected_tier": "flagship", "prompt": "Review this contract term for a data processing agreement: 'Processor may engage sub-processors without notice.' Explain the GDPR problem, the liability exposure, and a compliant replacement clause."}
+{"id": "hard-26", "category": "hard", "expected_tier": "flagship", "prompt": "Explain the difference between eventual, causal, and linearizable consistency with a concrete example where each one produces a different observable result."}
+{"id": "hard-27", "category": "hard", "expected_tier": "flagship", "prompt": "Plan the incident response for a leaked AWS root access key that was public on GitHub for 6 hours. Order the steps by urgency and explain the forensic questions to answer before rotating everything."}
+{"id": "hard-28", "category": "hard", "expected_tier": "flagship", "prompt": "Derive the Black-Scholes partial differential equation from a delta-hedged portfolio, stating each assumption."}
+{"id": "hard-29", "category": "hard", "expected_tier": "flagship", "prompt": "Design a permission system for a B2B app with organizations, teams, projects, and per-document sharing, supporting both role-based and attribute-based rules. Show how you avoid the N+1 authorization check problem."}
+{"id": "hard-30", "category": "hard", "expected_tier": "flagship", "prompt": "A model achieves 94% accuracy on a test set but performs poorly in production. Build a structured investigation covering data drift, label leakage, sampling bias, and evaluation mismatch, with a concrete check for each."}
