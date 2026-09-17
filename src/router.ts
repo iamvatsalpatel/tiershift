@@ -113,9 +113,11 @@ export function createRouter(opts: RouterOptions = {}): Router {
     if (!pick) throw new Error(`No model fits. Check provider keys and budget. Reasons: ${reason.join("; ")}`);
 
     let fallback: string | null = null;
+    let fallbackTier: string | null = null;
     if (config.fallback !== "none") {
       for (let fi = ti + 1; fi < order.length && !fallback; fi++) {
         fallback = pickInTier(config, order[fi], code.est_input_tokens, outTok, code.has_tools, undefined, env, [])?.id ?? null;
+        if (fallback) fallbackTier = order[fi];
       }
     }
 
@@ -128,6 +130,7 @@ export function createRouter(opts: RouterOptions = {}): Router {
       requested_tier: policy.tier,
       degraded,
       fallback,
+      fallback_tier: fallbackTier,
       signals: jev.signals,
       code_signals: code,
       confidence: Number(decidingConf.toFixed(3)),
@@ -176,7 +179,7 @@ export function createRouter(opts: RouterOptions = {}): Router {
         }
         attempts.push({ model: id, ok: true, latency_ms: r.latencyMs });
         const cost = actualCost(config.models?.[id], r.usage);
-        write(fromDecision(decision, { kind: "complete", model: id, tier: order[Math.max(0, order.findIndex((t) => config.tiers[t].includes(id)))], fell_back: id !== decision.model, cost_usd: cost, input_tokens: r.usage.inputTokens, output_tokens: r.usage.outputTokens, model_latency_ms: r.latencyMs, tag: input.tag }));
+        write(fromDecision(decision, { kind: "complete", model: id, tier: id === decision.model ? decision.tier : decision.fallback_tier ?? decision.tier, fell_back: id !== decision.model, cost_usd: cost, input_tokens: r.usage.inputTokens, output_tokens: r.usage.outputTokens, model_latency_ms: r.latencyMs, tag: input.tag }));
         return {
           decision, model: id, served_model: r.servedModel, fell_back: id !== decision.model, attempts,
           text: r.text, tool_calls: r.toolCalls, finish_reason: r.finishReason,

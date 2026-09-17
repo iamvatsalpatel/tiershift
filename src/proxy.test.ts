@@ -16,7 +16,7 @@ const config: Config = {
 };
 
 const decision: Decision = {
-  model: "p/small", provider: "p", tier: "fast", tier_index: 0, requested_tier: "fast", degraded: false, fallback: "q/medium",
+  model: "p/small", provider: "p", tier: "fast", tier_index: 0, requested_tier: "fast", degraded: false, fallback: "q/medium", fallback_tier: "mid",
   signals: { difficulty: 0.2, difficulty_confidence: 0.9, needs_reasoning: 0.1, stakes: 0.1, stakes_confidence: 0.9, domain: "general", domain_confidence: 0.9, has_code: 0, ambiguous: 0, output_length: 0, creative: 0, safety_sensitive: 0, trivial_ack: 0, mid_tier_ok: 0.5 },
   code_signals: { est_input_tokens: 10, has_tools: false, tool_count: 0, step: null, retries: 0, turn_count: 1 },
   confidence: 0.9, reason: ['rule "difficulty < 0.5" → fast'], est_cost_usd: 0.00001, est_output_tokens: 50, jev_latency_ms: 150, jev_input_tokens: 900,

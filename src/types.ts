@@ -140,6 +140,8 @@ export interface Decision {
   /** True when the model came from a lower tier than requested because nothing above had a key. */
   degraded: boolean;
   fallback: string | null;
+  /** Tier the fallback model was picked from. Null when there is no fallback. */
+  fallback_tier: string | null;
   signals: Signals;
   code_signals: CodeSignals;
   /** Lowest confidence among the Jev answers that decided the tier. */

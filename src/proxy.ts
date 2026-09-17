@@ -271,7 +271,8 @@ export function createProxy(opts: ProxyOptions): Server {
           throw new ProviderError(provider.name, null, `empty_answer:length (output budget consumed before any answer text; ${r.usage.outputTokens} output tokens billed)`);
         }
         // Mirror router.complete(): one "complete" entry with actual tokens, cost, and model latency.
-        if (decision) writeLog(fromDecision(decision, { kind: "complete", model: id, tier: tierOf(id), fell_back: id !== decision.model, cost_usd: actualCost(router.config.models?.[id], r.usage), input_tokens: r.usage.inputTokens, output_tokens: r.usage.outputTokens, model_latency_ms: r.latencyMs, tag }));
+        // The same model may sit in several tiers. Log the tier the decision chose, not the first tier that lists the model.
+        if (decision) writeLog(fromDecision(decision, { kind: "complete", model: id, tier: id === decision.model ? decision.tier : decision.fallback_tier ?? decision.tier, fell_back: id !== decision.model, cost_usd: actualCost(router.config.models?.[id], r.usage), input_tokens: r.usage.inputTokens, output_tokens: r.usage.outputTokens, model_latency_ms: r.latencyMs, tag }));
         sendJson(res, 200, toOpenAIResponse(r, id), {
           ...decisionHeaders(decision, id),
           ...(decision && id !== decision.model ? { "x-tiershift-fell-back": "true" } : {}),
