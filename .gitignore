@@ -16,3 +16,4 @@ __pycache__/
 *.log
 decisions.jsonl
 .tiershift/
+.claude/worktrees/
