@@ -1,7 +1,6 @@
 src/
 docs/
 bench/
-examples/
 .env*
 *.test.*
 tsconfig.json

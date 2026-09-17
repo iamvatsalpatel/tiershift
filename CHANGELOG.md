@@ -14,4 +14,5 @@ All notable changes to this project are documented here. The format follows [Kee
 - `tiershift sync-models` pulls prices, context windows, and capabilities from models.dev into `prices.yaml`. A weekly GitHub Action opens a pull request with changes.
 - CLI: `route`, `ask`, `check`, `sync-models`.
 - Degrade-down: when no model at or above the chosen tier has a key, use the best available model below and flag the decision.
+- Decision log at `.tiershift/decisions.jsonl` (on by default, no message text) with `tiershift report` for tier mix, spend, and saving against always-flagship, and `tiershift tune --candidate` to replay logged signals against another policy with no API calls. Per-call `tag` for splitting by agent or tenant.
 - Benchmark in `bench/`: 120 prompts in four categories, three arms (always flagship, always fast, tiershift), a blind LLM judge, per-category and traffic-mix analysis, a quality-versus-cost chart, and cached reruns. Results published in `bench/results.md`.

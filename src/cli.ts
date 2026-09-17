@@ -3,6 +3,9 @@
 import * as fsMod from "node:fs";
 import { createRouter } from "./router.js";
 import { syncModels } from "./sync-models.js";
+import { readLog, DEFAULT_LOG } from "./log.js";
+import { buildReport, tune } from "./analytics.js";
+import { loadConfig, availableTiers } from "./config.js";
 
 function loadDotenv() {
   try {
@@ -35,7 +38,64 @@ async function main() {
     return;
   }
 
-  const router = createRouter({ config: cfgPath });
+  const usd = (x: number) => (x >= 1 ? `$${x.toFixed(2)}` : `$${x.toFixed(4)}`);
+  const pctf = (x: number) => `${(x * 100).toFixed(0)}%`;
+  const logIdx = args.indexOf("--log");
+  const logPathArg = logIdx >= 0 ? args.splice(logIdx, 2)[1] : undefined;
+
+  if (cmd === "report") {
+    const cfg = loadConfig(cfgPath);
+    const path = logPathArg ?? cfg.log?.path ?? DEFAULT_LOG;
+    const entries = readLog(path);
+    if (entries.length === 0) { console.log(`no decisions in ${path}. Route something first: tiershift route "hello"`); return; }
+    const tiers = availableTiers(cfg, process.env);
+    const r = buildReport(entries, cfg, { tiers });
+    if (json) { console.log(JSON.stringify(r, null, 2)); return; }
+    console.log(`${r.n} decisions in ${path}\n${r.from} → ${r.to}\n`);
+    console.log(`${"tier".padEnd(10)}${"share".padStart(7)}${"n".padStart(6)}${"cost".padStart(11)}${"confidence".padStart(12)}${"jev p50".padStart(9)}`);
+    for (const t of r.tiers) console.log(`${t.tier.padEnd(10)}${pctf(t.share).padStart(7)}${String(t.n).padStart(6)}${usd(t.cost).padStart(11)}${t.mean_confidence.toFixed(2).padStart(12)}${(t.p50_jev_ms + " ms").padStart(9)}`);
+    console.log(`\n${"model".padEnd(34)}${"n".padStart(6)}${"cost".padStart(11)}`);
+    for (const m of r.models) console.log(`${m.model.padEnd(34)}${String(m.n).padStart(6)}${usd(m.cost).padStart(11)}`);
+    const actual = entries.filter((e) => e.kind === "complete").length;
+    console.log(`\ntotal ${usd(r.total_cost)}${actual < r.n ? ` (${r.n - actual} of ${r.n} are estimates; no model was called)` : ""}`);
+    if (r.flagship_model && r.saving_vs_flagship !== null) {
+      const top = Object.keys(cfg.tiers).at(-1)!;
+      const configuredTop = cfg.tiers[top][0];
+      console.log(`always ${r.flagship_model} would cost about ${usd(r.flagship_est_cost)} for the same requests → tiershift saved ${pctf(r.saving_vs_flagship)}${r.flagship_model !== configuredTop ? `\n  (baseline is your first flagship model with a key; ${configuredTop} has none)` : ""}`);
+    }
+    console.log(`jev: p50 ${r.jev.p50_ms} ms, p95 ${r.jev.p95_ms} ms, ${usd(r.jev.cost)} total`);
+    const flags = [r.low_confidence ? `${r.low_confidence} low-confidence (<0.5)` : "", r.degraded ? `${r.degraded} degraded` : "", r.fell_back ? `${r.fell_back} fell back` : ""].filter(Boolean);
+    if (flags.length) console.log(`flags: ${flags.join(", ")}`);
+    if (r.overrides.length) { console.log(`\noverrides fired:`); for (const o of r.overrides) console.log(`  ${String(o.n).padStart(5)}  ${o.reason}`); }
+    return;
+  }
+
+  if (cmd === "tune") {
+    const candIdx = args.indexOf("--candidate");
+    const candPath = candIdx >= 0 ? args.splice(candIdx, 2)[1] : undefined;
+    if (!candPath) { console.error("usage: tiershift tune --candidate other.yaml [--config tiershift.yaml] [--log path] [--json]"); process.exit(2); }
+    const base = loadConfig(cfgPath), cand = loadConfig(candPath);
+    const path = logPathArg ?? base.log?.path ?? DEFAULT_LOG;
+    const entries = readLog(path);
+    if (entries.length === 0) { console.log(`no decisions in ${path}`); return; }
+    const t = tune(entries, base, cand, { tiers: availableTiers(cand, process.env) });
+    if (json) { console.log(JSON.stringify(t, null, 2)); return; }
+    console.log(`replayed ${t.n} logged decisions against ${candPath}. No Jev calls, no model calls.\n`);
+    const tiers = Object.keys(cand.tiers);
+    console.log(`${"tier".padEnd(10)}${"current".padStart(9)}${"candidate".padStart(11)}`);
+    for (const tier of tiers) console.log(`${tier.padEnd(10)}${String(t.baseline.tiers[tier] ?? 0).padStart(9)}${String(t.candidate.tiers[tier] ?? 0).padStart(11)}`);
+    console.log(`\nmoved down ${t.moved_down}, moved up ${t.moved_up}, unchanged ${t.unchanged}${t.held_by_override ? `\n${t.held_by_override} would have moved on the rules alone, but an override held them (see \`overrides:\` in your policy)` : ""}`);
+    console.log(`estimated cost ${usd(t.baseline.est_cost)} → ${usd(t.candidate.est_cost)}${t.saving !== null ? ` (${t.saving >= 0 ? "saves" : "adds"} ${pctf(Math.abs(t.saving))})` : ""}`);
+    if (t.moves.length) {
+      console.log(`\nmoves to spot-check (difficulty / stakes / confidence):`);
+      for (const m of t.moves.slice(0, 12)) console.log(`  ${m.from.padEnd(9)}→ ${m.to.padEnd(9)} ${m.difficulty.toFixed(2)} / ${m.stakes.toFixed(2)} / ${m.confidence.toFixed(2)}`);
+      if (t.moves.length > 12) console.log(`  … ${t.moves.length - 12} more; use --json for all`);
+    }
+    console.log(`\nQuality is not measured here. Sample the moved requests before you adopt the candidate.`);
+    return;
+  }
+
+  const router = createRouter({ config: cfgPath, log: logPathArg });
 
   if (cmd === "check") {
     const av = router.available();
@@ -54,7 +114,7 @@ async function main() {
     console.log(`→ ${d.model}   tier=${d.tier}${d.degraded ? ` (requested ${d.requested_tier}, DEGRADED)` : ""}   fallback=${d.fallback ?? "none"}`);
     console.log(`  difficulty ${s.difficulty.toFixed(2)} (conf ${s.difficulty_confidence.toFixed(2)})  stakes ${s.stakes.toFixed(2)}  reasoning ${s.needs_reasoning.toFixed(2)}  domain ${s.domain}  len ${s.output_length.toFixed(1)}  trivial ${s.trivial_ack.toFixed(2)}`);
     console.log(`  ${d.reason.join("  |  ")}`);
-    console.log(`  jev ${d.jev_latency_ms} ms, ${d.jev_input_tokens} tokens ($${(d.jev_input_tokens * 0.042 / 1e6).toFixed(6)})   est call cost ${d.est_cost_usd === null ? "unknown" : "$" + d.est_cost_usd.toFixed(5)}`);
+    console.log(`  jev ${d.jev_latency_ms} ms, ${d.jev_input_tokens} tokens ($${(d.jev_input_tokens * 0.042 / 1e6).toFixed(6)})   est call cost ${d.est_cost_usd === null ? "unknown" : "$" + d.est_cost_usd.toFixed(5)}${router.logPath ? `   logged → ${router.logPath}` : ""}`);
     return;
   }
 
@@ -77,7 +137,9 @@ async function main() {
   tiershift route "prompt" [--json] [--config tiershift.yaml]   decide a model for one prompt
   tiershift ask "prompt" [--json] [--config tiershift.yaml]     decide, call the model, fall back on failure
   tiershift check [--config tiershift.yaml]                      show which configured models have keys
-  tiershift sync-models [--write]                                pull prices and limits from models.dev into prices.yaml`);
+  tiershift sync-models [--write]                                pull prices and limits from models.dev into prices.yaml
+  tiershift report [--log path] [--json]                         tier mix, spend, and saving vs always-flagship from the decision log
+  tiershift tune --candidate other.yaml [--log path]             replay logged decisions against another policy; no API calls`);
 }
 
 main().catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); });

@@ -37,7 +37,8 @@
     "tiershift.yaml",
     "prices.yaml",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "examples"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

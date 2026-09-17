@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeModelMeta, splitModel, validate } from "./config.js";
+import { availableTiers, mergeModelMeta, splitModel, validate } from "./config.js";
 
 describe("mergeModelMeta", () => {
   const bundled = { "a/x": { price: { input: 1, output: 2 }, context: 1000, caps: ["tools"] } };
@@ -32,5 +32,13 @@ describe("validate", () => {
   it("rejects empty sections", () => {
     expect(() => validate({ ...base, rules: [] })).toThrow(/rules/);
     expect(() => validate({ ...base, tiers: {} })).toThrow(/tiers/);
+  });
+});
+
+describe("availableTiers", () => {
+  const cfg = { providers: { a: { type: "anthropic" as const, api_key_env: "A_KEY" }, o: { type: "openai-compatible" as const } }, tiers: { fast: ["a/x", "o/y"], top: ["a/z"] }, rules: [{ default: "top" }] };
+  it("drops models whose provider key is missing and keeps key-less local providers", () => {
+    expect(availableTiers(cfg, {})).toEqual({ fast: ["o/y"], top: ["a/z"] });
+    expect(availableTiers(cfg, { A_KEY: "k" })).toEqual({ fast: ["a/x", "o/y"], top: ["a/z"] });
   });
 });

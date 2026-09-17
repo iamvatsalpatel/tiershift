@@ -48,3 +48,9 @@ export function splitModel(id: string): { provider: string; model: string } {
   if (i < 0) throw new Error(`Model id "${id}" must be "provider/model"`);
   return { provider: id.slice(0, i), model: id.slice(i + 1) };
 }
+
+/** Tiers filtered to models whose provider has a key (or needs none). A tier with no usable model keeps its full list. */
+export function availableTiers(cfg: Config, env: Record<string, string | undefined> = process.env): Record<string, string[]> {
+  const usable = (id: string) => { const p = cfg.providers[splitModel(id).provider]; return !!p && (!p.api_key_env || Boolean(env[p.api_key_env])); };
+  return Object.fromEntries(Object.entries(cfg.tiers).map(([tier, models]) => { const av = models.filter(usable); return [tier, av.length ? av : models]; }));
+}

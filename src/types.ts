@@ -24,6 +24,10 @@ export interface RouteInput {
   retries?: number;
   /** Per-call override of the max cost budget in USD. */
   maxCost?: number;
+  /** Free-text tag written to the decision log, e.g. an agent or tenant name. */
+  tag?: string;
+  /** @internal Skip the route-only log entry. Set by complete(). */
+  __noLog?: boolean;
 }
 
 /** Jev signals. Scores are 0-2 expected values. Nouls are 0-1 probabilities. */
@@ -97,6 +101,8 @@ export interface Config {
   fallback?: "up" | "none";
   /** Defaults applied to every completion call. */
   defaults?: { max_tokens?: number; temperature?: number };
+  /** Decision log. On by default at `.tiershift/decisions.jsonl`. */
+  log?: { enabled?: boolean; path?: string };
   /** When no model at or above the chosen tier has a key, use the best available model below. Default true. */
   degrade?: boolean;
   jev?: { model?: string; timeout_ms?: number };

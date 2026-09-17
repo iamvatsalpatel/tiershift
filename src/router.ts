@@ -7,6 +7,7 @@ import { buildProviders } from "./providers/index.js";
 import type { Provider } from "./providers/index.js";
 import { ProviderError } from "./providers/index.js";
 import type { Attempt, CompleteInput, CompleteResult, Config, Decision, ModelMeta, RouteInput } from "./types.js";
+import { DEFAULT_LOG, fromDecision, logEntry } from "./log.js";
 
 export interface RouterOptions {
   /** Path to tiershift.yaml. Defaults to ./tiershift.yaml, then the bundled default. */
@@ -14,6 +15,8 @@ export interface RouterOptions {
   /** Override env lookup, mainly for tests. */
   env?: Record<string, string | undefined>;
   typesafeApiKey?: string;
+  /** Decision log path. Defaults to config `log.path`, then `.tiershift/decisions.jsonl`. `false` disables. */
+  log?: string | false;
 }
 
 export interface Router {
@@ -23,6 +26,8 @@ export interface Router {
   complete(input: CompleteInput): Promise<CompleteResult>;
   config: Config;
   providers: Record<string, Provider>;
+  /** Where decisions are written, or null when logging is off. */
+  logPath: string | null;
   /** Models whose provider has a usable key, per tier, in preference order. */
   available(): Record<string, string[]>;
 }
@@ -62,6 +67,8 @@ export function createRouter(opts: RouterOptions = {}): Router {
   const client = new TypeSafeClient({ apiKey: opts.typesafeApiKey ?? env.TYPESAFE_API_KEY, defaultModel: config.jev?.model ?? "jev-latest" });
   const order = Object.keys(config.tiers);
   const providers = buildProviders(config, env);
+  const logPath = opts.log === false || config.log?.enabled === false ? null : typeof opts.log === "string" ? opts.log : config.log?.path ?? DEFAULT_LOG;
+  const write = (e: Parameters<typeof logEntry>[1]) => { if (logPath) try { logEntry(logPath, e); } catch { /* logging never breaks routing */ } };
 
   const available = () => Object.fromEntries(order.map((t) => [t, config.tiers[t].filter((id) => hasKey(config, splitModel(id).provider, env))]));
 
@@ -101,7 +108,7 @@ export function createRouter(opts: RouterOptions = {}): Router {
     }
 
     const decidingConf = Math.min(jev.signals.difficulty_confidence, jev.signals.stakes_confidence);
-    return {
+    const decision: Decision = {
       model: pick.id,
       provider: splitModel(pick.id).provider,
       tier: order[ti],
@@ -118,6 +125,8 @@ export function createRouter(opts: RouterOptions = {}): Router {
       jev_latency_ms: jev.latency_ms,
       jev_input_tokens: jev.input_tokens,
     };
+    if (!input.__noLog) write(fromDecision(decision, { kind: "route", tag: input.tag }));
+    return decision;
   }
 
   function actualCost(meta: ModelMeta | undefined, usage: { inputTokens: number; outputTokens: number }): number | null {
@@ -126,7 +135,7 @@ export function createRouter(opts: RouterOptions = {}): Router {
   }
 
   async function complete(input: CompleteInput): Promise<CompleteResult> {
-    const decision = await route(input);
+    const decision = await route({ ...input, __noLog: true });
     const candidates = [decision.model, decision.fallback].filter((m): m is string => Boolean(m));
     const attempts: Attempt[] = [];
     for (const id of candidates) {
@@ -144,11 +153,13 @@ export function createRouter(opts: RouterOptions = {}): Router {
           params: config.models?.[id]?.params,
         }, input.signal);
         attempts.push({ model: id, ok: true, latency_ms: r.latencyMs });
+        const cost = actualCost(config.models?.[id], r.usage);
+        write(fromDecision(decision, { kind: "complete", model: id, tier: order[Math.max(0, order.findIndex((t) => config.tiers[t].includes(id)))], fell_back: id !== decision.model, cost_usd: cost, input_tokens: r.usage.inputTokens, output_tokens: r.usage.outputTokens, model_latency_ms: r.latencyMs, tag: input.tag }));
         return {
           decision, model: id, served_model: r.servedModel, fell_back: id !== decision.model, attempts,
           text: r.text, tool_calls: r.toolCalls, finish_reason: r.finishReason,
           usage: { input_tokens: r.usage.inputTokens, output_tokens: r.usage.outputTokens },
-          cost_usd: actualCost(config.models?.[id], r.usage), latency_ms: r.latencyMs, raw: r.raw,
+          cost_usd: cost, latency_ms: r.latencyMs, raw: r.raw,
         };
       } catch (e) {
         if (input.signal?.aborted) throw e;
@@ -159,5 +170,5 @@ export function createRouter(opts: RouterOptions = {}): Router {
     throw new Error(`tiershift: every candidate failed. ${attempts.map((a) => `${a.model}: ${a.error}`).join(" | ")}`);
   }
 
-  return { route, complete, config, providers, available };
+  return { route, complete, config, providers, available, logPath };
 }
