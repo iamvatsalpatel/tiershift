@@ -6,3 +6,4 @@ bench/
 tsconfig.json
 vitest.config.*
 .github/
+python/
