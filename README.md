@@ -35,7 +35,7 @@ Three real routes. Every request starts on the fast tier. It moves up only when 
 | Strategy | Quality, 1 to 5 | Cost per 1,000 prompts | Answers that came back empty |
 |---|---|---|---|
 | Always the flagship, gpt-5.6-sol | 4.77 | $13.23 | 4 |
-| **tiershift** | **4.71** | **$10.21** | 3 |
+| **tiershift** | **4.71** | **$10.22** | 3 |
 | Always the mid model, gpt-5.6-terra | 4.85 | $8.74 | 0 |
 | Always the fast model, deepseek-flash | 4.78 | $0.37 | 0 |
 
