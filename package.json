@@ -7,7 +7,7 @@
   "author": "Vatsal Patel",
   "repository": {
     "type": "git",
-    "url": "https://github.com/iamvatsalpatel/tiershift"
+    "url": "git+https://github.com/iamvatsalpatel/tiershift.git"
   },
   "keywords": [
     "llm",
@@ -30,7 +30,7 @@
     }
   },
   "bin": {
-    "tiershift": "./dist/cli.js"
+    "tiershift": "dist/cli.js"
   },
   "files": [
     "dist",

@@ -4,7 +4,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+- `package.json`: `bin` path and `repository.url` in the form npm expects, so `npm publish` no longer warns.
+- PyPI metadata: license file and classifier so the project page shows MIT.
 
 ## [0.1.0] - 2026-09-17
 
