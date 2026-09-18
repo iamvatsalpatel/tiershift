@@ -6,14 +6,15 @@ import { ARMS, CATS, f2, here, loadMeta, loadRows, mean, money, pct, summaries }
 const rows = loadRows();
 const meta = loadMeta();
 
-let md = `# Benchmark results\n\nRun date ${meta.date}. ${meta.prompts} prompts, 3 arms, max_tokens ${meta.max_tokens}. Judge: \`${meta.judge}\` (blind, sees prompt and answer only).\n\n`;
-md += `Arms: \`always_flagship\` = ${meta.flagship}, \`always_fast\` = ${meta.fast}, \`tiershift\` = routed by the default policy. tiershift cost includes the Jev routing call.\n\n`;
+let md = `# Benchmark results\n\nRun date ${meta.date}. ${meta.prompts} prompts, 4 arms, max_tokens ${meta.max_tokens}. Primary judge \`${meta.judge}\`, second judge \`${meta.judge2 ?? "none"}\`. Both blind: they see the prompt and the answer, never the model.\n\n`;
+md += `Arms: \`always_flagship\` = ${meta.flagship}, \`always_mid\` = ${meta.mid ?? "n/a"}, \`always_fast\` = ${meta.fast}, \`tiershift\` = the shipped default policy choosing among exactly those models plus ${meta.local ?? "a local model"}. One answer per (model, prompt) is shared across arms, so tiershift is judged on the same answer the fixed arm got. tiershift cost includes the Jev routing call and any failed attempt before a fallback.\n\n`;
 
 md += `## Headline\n\n| Arm | Mean quality (1-5) | Share scored 4 or 5 | Total cost | Cost per 1,000 prompts | p50 latency | p95 latency | Judged | Empty answers |\n|---|---|---|---|---|---|---|---|---|\n`;
 const S = summaries(rows);
 for (const arm of ARMS) { const s = S[arm]; md += `| ${arm} | ${f2(s.quality)} | ${(s.q5 * 100).toFixed(0)}% | ${money(s.cost)} | ${money(s.per1k)} | ${Math.round(s.p50)} ms | ${Math.round(s.p95)} ms | ${s.n}/${s.total} | ${s.empty} |\n`; }
-const fl = S.always_flagship, ts = S.tiershift, fa = S.always_fast;
-md += `\n**Read:** tiershift reached ${((ts.quality / fl.quality) * 100).toFixed(1)}% of flagship quality at ${((ts.cost / fl.cost) * 100).toFixed(1)}% of flagship cost. always_fast reached ${((fa.quality / fl.quality) * 100).toFixed(1)}% of flagship quality at ${((fa.cost / fl.cost) * 100).toFixed(1)}% of the cost.\n\n`;
+const fl = S.always_flagship, ts = S.tiershift, fa = S.always_fast, mi = S.always_mid;
+const rel = (s: typeof fl) => `${((s.quality / fl.quality) * 100).toFixed(1)}% of flagship quality at ${((s.cost / fl.cost) * 100).toFixed(0)}% of flagship cost`;
+md += `\n**Read:** tiershift: ${rel(ts)}. always_mid: ${rel(mi)}. always_fast: ${rel(fa)}.\n\n`;
 
 md += `## Quality by category\n\n| Category | ${ARMS.join(" | ")} |\n|---|${ARMS.map(() => "---").join("|")}|\n`;
 for (const c of CATS) md += `| ${c} | ${ARMS.map((a) => f2(mean(rows.filter((r) => r.arm === a && r.category === c && r.quality !== null).map((r) => r.quality as number)))).join(" | ")} |\n`;
@@ -68,7 +69,14 @@ for (const { name, mix } of MIXES) {
   for (const a of ARMS) md += `| ${a === ARMS[0] ? `${name} (${CATS.map((c) => mix[c]).join(" / ")})` : ""} | ${a} | ${qual(a).toFixed(2)} | $${cost(a).toFixed(2)} | ${a === "always_flagship" ? "baseline" : `${(100 * (1 - cost(a) / base)).toFixed(0)}%`} |\n`;
 }
 
-md += `\n## Chart\n\n![Quality against cost, three arms](chart-light.svg)\n\nRebuild with \`npm run bench:chart\`. A dark variant is in \`chart-dark.svg\`.\n\n## Caveats\n\n- One judge model, from the same family as the flagship arm. It may favor that family's style. Judge cost is excluded from every arm.\n- Expected tiers are author labels, used only for the agreement matrix.\n- max_tokens ${meta.max_tokens} caps long answers equally across arms.\n- Prices from \`prices.yaml\` via models.dev on ${meta.date}. DeepSeek is listed at the off-peak rate.\n- Every raw record is in \`results.jsonl\`. Rerun \`npm run bench:report\` to rebuild this file.\n`;
+const both = rows.filter((x) => x.quality !== null && x.quality2 !== null);
+if (both.length) {
+  const exact = both.filter((x) => x.quality === x.quality2).length, within1 = both.filter((x) => Math.abs((x.quality as number) - (x.quality2 as number)) <= 1).length;
+  md += `\n## Judge agreement\n\n${both.length} answers scored by both judges. Exact agreement ${((exact / both.length) * 100).toFixed(0)}%, within one point ${((within1 / both.length) * 100).toFixed(0)}%.\n\n| Arm | Mean, ${meta.judge} | Mean, ${meta.judge2 ?? "second judge"} |\n|---|---|---|\n`;
+  for (const a of ARMS) { const rs = both.filter((x) => x.arm === a); md += `| ${a} | ${f2(mean(rs.map((x) => x.quality as number)))} | ${f2(mean(rs.map((x) => x.quality2 as number)))} |\n`; }
+}
+
+md += `\n## Chart\n\n![Quality against cost, three arms](chart-light.svg)\n\nRebuild with \`npm run bench:chart\`. A dark variant is in \`chart-dark.svg\`.\n\n## Caveats\n\n- The primary judge wrote none of the answers. The second judge shares a family with the fast arm. Judge cost is excluded from every arm.\n- Expected tiers are author labels, used only for the agreement matrix.\n- max_tokens ${meta.max_tokens} caps long answers equally across arms.\n- Prices from \`prices.yaml\` via models.dev on ${meta.date}. DeepSeek is listed at the off-peak rate.\n- Every raw record is in \`results.jsonl\`. Rerun \`npm run bench:report\` to rebuild this file.\n`;
 
 writeFileSync(join(here, "results.md"), md);
 console.log(md);

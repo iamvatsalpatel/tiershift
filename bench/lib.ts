@@ -5,11 +5,11 @@ import { fileURLToPath } from "node:url";
 import type { Record_ } from "./run.js";
 
 export const here = dirname(fileURLToPath(import.meta.url));
-export const ARMS = ["always_flagship", "always_fast", "tiershift"] as const;
+export const ARMS = ["always_flagship", "always_mid", "always_fast", "tiershift"] as const;
 export type Arm = (typeof ARMS)[number];
 export const CATS = ["ack", "simple", "moderate", "hard"];
 
-export interface Meta { flagship: string; fast: string; judge: string; max_tokens: number; date: string; prompts: number }
+export interface Meta { flagship: string; mid?: string; fast: string; local?: string; judge: string; judge2?: string; max_tokens: number; date: string; prompts: number }
 
 export function loadRows(): Record_[] { return readFileSync(join(here, "results.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l)); }
 export function loadMeta(): Meta { return JSON.parse(readFileSync(join(here, "meta.json"), "utf8")); }

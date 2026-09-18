@@ -12,13 +12,13 @@ const THEMES: Theme[] = [
   { name: "light", surface: "#fcfcfb", text: "#0b0b0b", text2: "#52514e", muted: "#898781", grid: "#e1e0d9", axis: "#c3c2b7", accent: "#2a78d6", gray: "#898781" },
   { name: "dark", surface: "#1a1a19", text: "#ffffff", text2: "#c3c2b7", muted: "#898781", grid: "#2c2c2a", axis: "#383835", accent: "#3987e5", gray: "#8a8983" },
 ];
-const LABEL: Record<Arm, string> = { always_flagship: "Always flagship", always_fast: "Always fast", tiershift: "tiershift" };
+const LABEL: Record<Arm, string> = { always_flagship: "Always flagship", always_mid: "Always mid", always_fast: "Always fast", tiershift: "tiershift" };
 const FONT = `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
 export function renderChart(t: Theme): string {
   const rows = loadRows(), meta = loadMeta(), S = summaries(rows);
-  const W = 760, H = 440, m = { top: 84, right: 220, bottom: 64, left: 64 };
+  const W = 800, H = 440, m = { top: 84, right: 230, bottom: 64, left: 64 };
   const pw = W - m.left - m.right, ph = H - m.top - m.bottom;
 
   // x: cost per 1,000 prompts, log10. Ticks at powers of ten that bracket the data.
@@ -33,8 +33,8 @@ export function renderChart(t: Theme): string {
   let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="t d" font-family='${FONT}'>\n`;
   s += `<title id="t">Quality against cost, three arms</title>\n<desc id="d">${esc(ARMS.map((a) => `${LABEL[a]}: quality ${S[a].quality.toFixed(2)}, ${fmtCost(S[a].per1k)} per 1,000 prompts`).join(". "))}.</desc>\n`;
   s += `<rect width="${W}" height="${H}" fill="${t.surface}"/>\n`;
-  s += `<text x="${m.left}" y="34" fill="${t.text}" font-size="17" font-weight="600">Same ${meta.prompts} prompts. Same judge. Three ways to pick a model.</text>\n`;
-  s += `<text x="${m.left}" y="56" fill="${t.text2}" font-size="12.5">Mean quality 1 to 5, judged blind by ${esc(meta.judge.split("/")[1])} · cost per 1,000 prompts, log scale · ${meta.date}</text>\n`;
+  s += `<text x="${m.left}" y="34" fill="${t.text}" font-size="17" font-weight="600">The fast model matched the flagship. tiershift is the safety net.</text>\n`;
+  s += `<text x="${m.left}" y="56" fill="${t.text2}" font-size="12.5">${meta.prompts} prompts · mean quality 1 to 5, judged blind by ${esc(meta.judge.split("/")[1])} · cost per 1,000 prompts, log scale · ${meta.date}</text>\n`;
 
   // gridlines and axes: hairline, solid, recessive
   for (let q = 1; q <= 5; q++) {
@@ -52,27 +52,29 @@ export function renderChart(t: Theme): string {
 
   // marks: 12px dots with a 2px surface ring; tiershift in accent, baselines in gray
   const pts = ARMS.map((a) => ({ a, cx: x(S[a].per1k), cy: y(S[a].quality), color: a === "tiershift" ? t.accent : t.gray }));
-  // Labels: right of the dot by default. Push apart vertically on collision. If a right-side label box
-  // would cover another dot, flip that label to the left side instead.
-  const LABEL_W = 170, LABEL_H = 34;
-  const labels = pts.map((p) => ({ ...p, ly: p.cy, side: 1 as 1 | -1 })).sort((p, q) => p.ly - q.ly);
-  // Push apart only when the label boxes would overlap in both axes. Far-apart dots keep their labels beside them.
-  for (let i = 1; i < labels.length; i++) for (let j = 0; j < i; j++) {
-    const a = labels[j], b = labels[i];
-    if (Math.abs(a.cx - b.cx) < LABEL_W + 14 && b.ly - a.ly < LABEL_H) b.ly = a.ly + LABEL_H;
-  }
-  for (const l of labels) {
-    const covers = (side: 1 | -1) => pts.some((o) => o.a !== l.a && (side === 1 ? o.cx > l.cx + 8 && o.cx < l.cx + 14 + LABEL_W : o.cx < l.cx - 8 && o.cx > l.cx - 14 - LABEL_W) && Math.abs(o.cy - l.ly) < LABEL_H);
-    if (covers(1) && !covers(-1) && l.cx - 14 - LABEL_W > m.left) l.side = -1;
-  }
+  // Labels. Four points can crowd the top-right corner, so place each label by rule, not by push-apart:
+  // the cheapest point labels to its right; the most expensive labels to its right; the two middle points
+  // label below and above their dots, offset horizontally so the text never crosses another dot or label.
+  const LABEL_H = 34;
+  type Placed = { a: Arm; cx: number; cy: number; color: string; lx: number; ly: number; anchor: "start" | "end" | "middle"; leader: boolean };
+  const byCost = [...pts].sort((p, q) => p.cx - q.cx);
+  const placed: Placed[] = byCost.map((p, i) => {
+    if (i === 0) return { ...p, lx: p.cx + 14, ly: p.cy, anchor: "start", leader: false };
+    if (i === byCost.length - 1) return { ...p, lx: p.cx + 14, ly: p.cy, anchor: "start", leader: false };
+    // middle points: stack below the plot's crowded corner, alternating rows
+    const row = i; // 1 or 2
+    return { ...p, lx: p.cx - 40 * (row - 1), ly: p.cy + LABEL_H * row + 6, anchor: "middle", leader: true };
+  });
+  // If a right-side label would run past the canvas, flip it to the left.
+  for (const l of placed) if (l.anchor === "start" && l.lx + 175 > W - 12) { l.lx = l.cx - 14; l.anchor = "end"; }
   for (const p of pts) {
     s += `<circle cx="${p.cx}" cy="${p.cy}" r="8" fill="${t.surface}"/>\n<circle cx="${p.cx}" cy="${p.cy}" r="6" fill="${p.color}"/>\n`;
   }
-  for (const l of labels) {
-    const S1 = S[l.a], lx = l.cx + 14 * l.side, anchor = l.side === 1 ? "start" : "end";
-    if (Math.abs(l.ly - l.cy) > 2) s += `<line x1="${l.cx + 8 * l.side}" y1="${l.cy}" x2="${lx - 3 * l.side}" y2="${l.ly - 4}" stroke="${t.axis}" stroke-width="1"/>\n`;
-    s += `<text x="${lx}" y="${l.ly}" fill="${t.text}" font-size="13" font-weight="${l.a === "tiershift" ? 600 : 500}" text-anchor="${anchor}">${esc(LABEL[l.a])}</text>\n`;
-    s += `<text x="${lx}" y="${l.ly + 16}" fill="${t.text2}" font-size="11.5" text-anchor="${anchor}">quality ${S1.quality.toFixed(2)} · ${fmtCost(S1.per1k)} per 1k</text>\n`;
+  for (const l of placed) {
+    const S1 = S[l.a];
+    if (l.leader) s += `<line x1="${l.cx}" y1="${l.cy + 8}" x2="${l.lx}" y2="${l.ly - 14}" stroke="${t.axis}" stroke-width="1"/>\n`;
+    s += `<text x="${l.lx}" y="${l.ly}" fill="${t.text}" font-size="13" font-weight="${l.a === "tiershift" ? 600 : 500}" text-anchor="${l.anchor}">${esc(LABEL[l.a])}</text>\n`;
+    s += `<text x="${l.lx}" y="${l.ly + 16}" fill="${t.text2}" font-size="11.5" text-anchor="${l.anchor}">quality ${S1.quality.toFixed(2)} · ${fmtCost(S1.per1k)} per 1k</text>\n`;
   }
   // one-line read, bottom right of plot, in text tokens
   const fl = S.always_flagship, ts = S.tiershift;

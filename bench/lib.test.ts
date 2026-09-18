@@ -4,7 +4,7 @@ import type { Record_ } from "./run.js";
 
 const rec = (over: Partial<Record_>): Record_ => ({
   id: "x", category: "ack", expected_tier: "local", arm: "tiershift", model: "m", served_model: "m", tier: "local", fell_back: false,
-  quality: 5, judge_note: "", input_tokens: 10, output_tokens: 5, cost_usd: 0.001, latency_ms: 100, jev_latency_ms: 300, jev_cost_usd: 0.00004,
+  quality: 5, judge_note: "", quality2: 5, judge2_note: "", input_tokens: 10, output_tokens: 5, cost_usd: 0.001, latency_ms: 100, jev_latency_ms: 300, jev_cost_usd: 0.00004,
   signals: null, reason: null, answer_chars: 10, empty_answer: false, error: null, ...over,
 });
 

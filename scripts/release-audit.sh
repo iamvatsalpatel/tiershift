@@ -33,10 +33,16 @@ check bash -c '
   node -e "import(\"tiershift\").then(m=>{ if(typeof m.createRouter!==\"function\") process.exit(1) })"
   rm -rf "$T"'
 
-echo "== 5. README commands exist in the CLI =="
+echo "== 5. every CLI command is documented (README or docs/CLI.md) and every documented command exists =="
 for cmd in check route ask report tune sync-models serve; do
-  check bash -c "grep -q 'cmd === \"$cmd\"' src/cli.ts && grep -q 'tiershift $cmd' README.md"
+  check bash -c "grep -q 'cmd === \"$cmd\"' src/cli.ts && cat README.md docs/CLI.md | grep -q 'tiershift $cmd'"
 done
+echo "== 5b. README numbers match bench/results.jsonl =="
+check node -e '
+const fs=require("fs"); const rows=fs.readFileSync("bench/results.jsonl","utf8").trim().split("\n").map(JSON.parse); const readme=fs.readFileSync("README.md","utf8");
+const arm=a=>{const rs=rows.filter(r=>r.arm===a); return [ (rs.reduce((s,r)=>s+r.quality,0)/rs.length).toFixed(2), (rs.reduce((s,r)=>s+r.cost_usd,0)/rs.length*1000).toFixed(2), rs.filter(r=>r.empty_answer).length ];};
+let bad=[]; for (const [a,label] of [["always_flagship","Always the flagship"],["tiershift","**tiershift**"],["always_mid","Always the mid model"],["always_fast","Always the fast model"]]) { const [q,c,e]=arm(a); const re=new RegExp(label.replace(/[*]/g,"\\*")+"[^|]*\\|[ *]*"+q+"[ *]*\\|[ *]*\\$"+c+"[ *]*\\|[ *]*"+e+"[ *]*\\|"); if(!re.test(readme)) bad.push(a+" expected "+q+" $"+c+" "+e); }
+if (bad.length) { console.error(bad.join("; ")); process.exit(1); }'
 
 echo "== 6. Jev model is pinned, not floating =="
 check bash -c 'grep -qE "^\s*model:\s*jev-[0-9]+\.[0-9]+\.[0-9]+" tiershift.yaml'
