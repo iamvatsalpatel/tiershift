@@ -15,13 +15,13 @@
 
 ```
 $ tiershift route "thanks, that's all for now"
-→ deepseek/deepseek-flash      tier=fast       default → fast
+→ deepseek/deepseek-flash     fast      default → fast
 
-$ tiershift route "Prove that there are infinitely many primes of the form 4k+3."
-→ openai/gpt-5.6-terra         tier=mid        needs_reasoning 0.97 → at_least mid
+$ tiershift route "Prove there are infinitely many primes of the form 4k+3."
+→ openai/gpt-5.6-terra        mid       needs_reasoning 0.97 → at_least mid
 
-$ tiershift route "Review this indemnification clause for risk: Vendor shall indemnify Client against all claims arising from any cause whatsoever."
-→ anthropic/claude-fable-5-1   tier=flagship   stakes 1.99 → at_least flagship
+$ tiershift route "Redline this clause: Vendor indemnifies Client against all claims whatsoever."
+→ anthropic/claude-fable-5-1  flagship  stakes 1.98 → at_least flagship
 ```
 
 Three real routes. Every request starts on the fast tier. It moves up only when Jev finds a reason: multi-step reasoning, hard difficulty, high stakes, or safety. The reason is printed with every decision.
