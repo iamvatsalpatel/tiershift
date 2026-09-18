@@ -1,6 +1,6 @@
 [project]
 name = "tiershift"
-version = "0.1.0"
+version = "0.2.0"
 description = "Shift every LLM call to the cheapest model that can handle it. Routing decided by TypeSafe Jev in ~300 ms. No training data. Policy in plain YAML."
 readme = "README.md"
 license = "MIT"

@@ -121,6 +121,8 @@ export interface Config {
   defaults?: { max_tokens?: number; temperature?: number; min_output_tokens?: number };
   /** Decision log. On by default at `.tiershift/decisions.jsonl`. */
   log?: { enabled?: boolean; path?: string };
+  /** Answer gate: after an answer from a listed tier, one Jev call checks it addresses the request; below `threshold`, retry one tier up. Off by default. */
+  gate?: { enabled?: boolean; threshold?: number; tiers?: string[] };
   /** When no model at or above the chosen tier has a key, use the best available model below. Default true. */
   degrade?: boolean;
   /** Jev model and timeout. Defaults to the pinned `DEFAULT_JEV_MODEL`; routing changes when the model changes. */
@@ -149,6 +151,9 @@ export interface Decision {
   /** One line per applied rule or override, in order. */
   reason: string[];
   est_cost_usd: number | null;
+  /** What the same request would cost on the first usable model of the top tier. Null when unpriced. */
+  est_flagship_cost_usd: number | null;
+  est_flagship_model: string | null;
   est_output_tokens: number;
   jev_latency_ms: number;
   jev_input_tokens: number;
@@ -180,8 +185,21 @@ export interface CompleteResult {
   tool_calls: { id: string; name: string; arguments: string }[];
   finish_reason: string;
   usage: { input_tokens: number; output_tokens: number };
-  /** Actual cost from reported usage and prices.yaml. Null when the price is unknown. */
+  /** Cost of the answer that was served, from reported usage and prices.yaml. Null when the price is unknown. */
   cost_usd: number | null;
+  /** Everything billed for this request: failed attempts, gate calls, and the served answer. This is what the log records. */
+  total_cost_usd: number | null;
+  /** Answer-gate result for the served answer, or null when the gate did not run. */
+  gate: GateResult | null;
   latency_ms: number;
   raw: unknown;
+}
+
+export interface GateResult {
+  /** P(the answer fully addresses the request), from Jev. */
+  addresses: number;
+  threshold: number;
+  passed: boolean;
+  latency_ms: number;
+  jev_input_tokens: number;
 }

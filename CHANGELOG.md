@@ -4,8 +4,19 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.0] - 2026-09-18
+
+The default policy changed. Routing decisions differ from 0.1.0 for the same prompts: the flagship tier is now opt-in. Replay your log with `tiershift tune --candidate` before upgrading a production policy, or pin your own `rules:`.
+
+### Added
+- Answer gate (opt in, `gate:` in the YAML): after a fast-tier answer, one Jev call checks that the answer addresses the request; below the threshold, `complete()` retries one tier up. `CompleteResult.gate` and `total_cost_usd` report it; the log entry carries `gate_addresses`.
+- `Decision.est_flagship_cost_usd` and `est_flagship_model`: what the same request would cost on the top tier. `route` and `ask` print the saving per decision.
+- `tiershift explain [--last N]`: the eleven signals, the reasons, and the cost behind recent decisions.
+
 ### Changed
-- Default policy is escalate-only: every request starts on the fast tier; `needs_reasoning > 0.8 or difficulty >= 1.3` lifts to mid; `stakes > 1.5` or `safety_sensitive > 0.7` lifts to flagship. The local tier is off by default (a commented override enables it). On the benchmark this cut cost 23 percent against always-flagship at 99 percent of its quality; the previous default saved 7 percent.
+- Default policy is escalate-only: every request starts on the fast tier; `needs_reasoning > 0.8 or difficulty >= 1.3` and `stakes > 1.5 or safety_sensitive > 0.7` lift to mid. The flagship and local tiers are off by default; one commented line each turns them on. On the benchmark this matched always-flagship quality at 60 percent of its cost; the first default saved 7 percent.
 - Benchmark: four arms (always flagship, always mid, always fast, tiershift), one shared answer per model and prompt, two blind judges from families that wrote no answers (Sonnet 5 and DeepSeek v4-pro), judge agreement reported. Models are pinned by env vars so a new provider key never changes the arms.
 - README rewritten around the measured result. Reference material moved to `docs/`.
 

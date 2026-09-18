@@ -55,7 +55,7 @@ Copy `tiershift.yaml` from the [repository](https://github.com/iamvatsalpatel/ti
 
 ## Status
 
-v0.1.0. Sync API only. Async `route`/`complete` are planned. The test suite needs no network and includes every shared conformance case from `conformance/`.
+Sync API only. Async `route`/`complete` are planned. The test suite needs no network and includes every shared conformance case from `conformance/`.
 
 ## License
 

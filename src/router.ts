@@ -2,13 +2,13 @@
 import { TypeSafeClient } from "@typesafe-ai/sdk";
 import { loadConfig, splitModel } from "./config.js";
 import { applyPolicy, estimateOutputTokens } from "./policy.js";
-import { askJev, codeSignals } from "./signals.js";
+import { askJev, askGate, codeSignals } from "./signals.js";
 import type { JevClient } from "./signals.js";
 import { buildProviders } from "./providers/index.js";
 import type { Provider } from "./providers/index.js";
 import { ProviderError } from "./providers/index.js";
 import { DEFAULT_JEV_MODEL } from "./types.js";
-import type { Attempt, CompleteInput, CompleteResult, Config, Decision, ModelMeta, RouteInput } from "./types.js";
+import type { Attempt, CompleteInput, CompleteResult, Config, Decision, GateResult, ModelMeta, RouteInput } from "./types.js";
 import { DEFAULT_LOG, fromDecision, logEntry } from "./log.js";
 
 export interface RouterOptions {
@@ -66,6 +66,8 @@ function pickInTier(cfg: Config, tier: string, inTok: number, outTok: number, ne
   }
   return null;
 }
+
+const JEV_PRICE_PER_TOKEN = 0.042 / 1e6;
 
 export function createRouter(opts: RouterOptions = {}): Router {
   const env = opts.env ?? process.env;
@@ -130,6 +132,10 @@ export function createRouter(opts: RouterOptions = {}): Router {
     }
 
     const decidingConf = Math.min(jev.signals.difficulty_confidence, jev.signals.stakes_confidence);
+    // Reference: the same request on the top tier's first usable model. Code arithmetic, never Jev.
+    const topTier = order[order.length - 1];
+    const topModel = (config.tiers[topTier] ?? []).find((id) => hasKey(config, splitModel(id).provider, env)) ?? config.tiers[topTier]?.[0] ?? null;
+    const flagshipCost = topModel ? estCost(config.models?.[topModel], code.est_input_tokens, outTok) : null;
     const decision: Decision = {
       model: pick.id,
       provider: splitModel(pick.id).provider,
@@ -144,6 +150,8 @@ export function createRouter(opts: RouterOptions = {}): Router {
       confidence: Number(decidingConf.toFixed(3)),
       reason,
       est_cost_usd: pick.cost,
+      est_flagship_cost_usd: flagshipCost,
+      est_flagship_model: topModel,
       est_output_tokens: outTok,
       jev_latency_ms: jev.latency_ms,
       jev_input_tokens: jev.input_tokens,
@@ -161,6 +169,11 @@ export function createRouter(opts: RouterOptions = {}): Router {
     const decision = await route({ ...input, __noLog: true });
     const candidates = [decision.model, decision.fallback].filter((m): m is string => Boolean(m));
     const attempts: Attempt[] = [];
+    const gateCfg = config.gate ?? {};
+    const gateOn = gateCfg.enabled === true;
+    const gateTiers = new Set(gateCfg.tiers ?? ["fast"]);
+    const gateThreshold = gateCfg.threshold ?? 0.5;
+    let billed = 0; // failed attempts and gate calls, added to the served answer's cost
     const minOut = config.defaults?.min_output_tokens ?? 1024;
     for (const id of candidates) {
       const { provider: pname, model } = splitModel(id);
@@ -183,16 +196,32 @@ export function createRouter(opts: RouterOptions = {}): Router {
           params: config.models?.[id]?.params,
         }, input.signal);
         if (r.text.trim().length === 0 && r.toolCalls.length === 0 && r.finishReason === "length") {
+          billed += actualCost(config.models?.[id], r.usage) ?? 0;
           throw new ProviderError(pname, null, `empty_answer:length (output budget ${maxTokens} consumed before any answer text; ${r.usage.outputTokens} output tokens billed)`);
         }
-        attempts.push({ model: id, ok: true, latency_ms: r.latencyMs });
         const cost = actualCost(config.models?.[id], r.usage);
-        write(fromDecision(decision, { kind: "complete", model: id, tier: id === decision.model ? decision.tier : decision.fallback_tier ?? decision.tier, fell_back: id !== decision.model, cost_usd: cost, input_tokens: r.usage.inputTokens, output_tokens: r.usage.outputTokens, model_latency_ms: r.latencyMs, tag: input.tag }));
+        const tierOfId = id === decision.model ? decision.tier : decision.fallback_tier ?? decision.tier;
+        let gate: GateResult | null = null;
+        const hasNext = candidates.indexOf(id) < candidates.length - 1;
+        if (gateOn && gateTiers.has(tierOfId) && hasNext && r.toolCalls.length === 0) {
+          const g = await askGate(client(), input.messages, r.text, jevModel, config.jev?.timeout_ms);
+          billed += g.input_tokens * JEV_PRICE_PER_TOKEN;
+          gate = { addresses: g.addresses, threshold: gateThreshold, passed: g.addresses >= gateThreshold, latency_ms: g.latency_ms, jev_input_tokens: g.input_tokens };
+          if (!gate.passed) {
+            billed += cost ?? 0;
+            decision.reason.push(`gate: P(addresses)=${g.addresses.toFixed(2)} < ${gateThreshold} on ${id} → retry on ${candidates[candidates.indexOf(id) + 1]}`);
+            attempts.push({ model: id, ok: false, latency_ms: r.latencyMs + g.latency_ms, error: `gate:addresses ${g.addresses.toFixed(2)} < ${gateThreshold}` });
+            continue;
+          }
+        }
+        attempts.push({ model: id, ok: true, latency_ms: r.latencyMs });
+        const total = cost === null ? null : cost + billed;
+        write(fromDecision(decision, { kind: "complete", model: id, tier: tierOfId, fell_back: id !== decision.model, cost_usd: total, input_tokens: r.usage.inputTokens, output_tokens: r.usage.outputTokens, model_latency_ms: r.latencyMs, tag: input.tag, ...(gate ? { gate_addresses: gate.addresses } : {}) }));
         return {
           decision, model: id, served_model: r.servedModel, fell_back: id !== decision.model, attempts,
           text: r.text, tool_calls: r.toolCalls, finish_reason: r.finishReason,
           usage: { input_tokens: r.usage.inputTokens, output_tokens: r.usage.outputTokens },
-          cost_usd: cost, latency_ms: r.latencyMs, raw: r.raw,
+          cost_usd: cost, total_cost_usd: total, gate, latency_ms: r.latencyMs + (gate?.latency_ms ?? 0), raw: r.raw,
         };
       } catch (e) {
         if (input.signal?.aborted) throw e;

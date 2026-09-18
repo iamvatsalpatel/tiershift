@@ -119,6 +119,12 @@ class Override(TypedDict, total=False):
     """Move up this many tiers, capped at the top."""
 
 
+class GateConfig(TypedDict, total=False):
+    enabled: bool
+    threshold: float
+    tiers: list[str]
+
+
 class Config(TypedDict, total=False):
     providers: dict[str, ProviderConfig]
     tiers: dict[str, list[str]]
@@ -131,6 +137,8 @@ class Config(TypedDict, total=False):
     log: dict[str, Any]
     degrade: bool
     jev: dict[str, Any]
+    gate: GateConfig
+    """Answer gate: after an answer from a listed tier, one Jev call checks it addresses the request; below `threshold`, retry one tier up. Off by default."""
 
 
 @dataclass
@@ -142,11 +150,16 @@ class Decision:
     requested_tier: str
     degraded: bool
     fallback: Optional[str]
+    fallback_tier: Optional[str]
+    """Tier the fallback model was picked from. None when there is no fallback."""
     signals: Signals
     code_signals: CodeSignals
     confidence: float
     reason: list[str]
     est_cost_usd: Optional[float]
+    est_flagship_cost_usd: Optional[float]
+    """What the same request would cost on the first usable model of the top tier. None when unpriced."""
+    est_flagship_model: Optional[str]
     est_output_tokens: int
     jev_latency_ms: int
     jev_input_tokens: int
@@ -173,6 +186,16 @@ class Attempt:
 
 
 @dataclass
+class GateResult:
+    addresses: float
+    """P(the answer fully addresses the request), from Jev."""
+    threshold: float
+    passed: bool
+    latency_ms: int
+    jev_input_tokens: int
+
+
+@dataclass
 class CompleteResult:
     decision: Decision
     model: str
@@ -184,5 +207,10 @@ class CompleteResult:
     finish_reason: str
     usage: dict[str, int]
     cost_usd: Optional[float]
+    """Cost of the answer that was served. None when the price is unknown."""
+    total_cost_usd: Optional[float]
+    """Everything billed for this request: failed attempts, gate calls, and the served answer. This is what the log records."""
+    gate: Optional[GateResult]
+    """Answer-gate result for the served answer, or None when the gate did not run."""
     latency_ms: int
     raw: Any = field(repr=False, default=None)

@@ -17,8 +17,10 @@ export interface LogEntry {
   code_signals: Decision["code_signals"];
   reason: string[];
   est_cost_usd: number | null;
-  /** Actual cost from reported usage. Null for route-only entries. */
+  /** Everything billed for the request: failed attempts, gate calls, and the served answer. Null for route-only entries. */
   cost_usd: number | null;
+  /** Answer-gate probability for the served answer, when the gate ran. */
+  gate_addresses?: number;
   input_tokens: number | null;
   output_tokens: number | null;
   jev_latency_ms: number;

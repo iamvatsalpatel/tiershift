@@ -1,4 +1,4 @@
-"""tiershift CLI: route, ask, check, report, tune."""
+"""tiershift CLI: route, ask, check, report, tune, explain."""
 
 from __future__ import annotations
 
@@ -67,7 +67,11 @@ def cmd_route(args: argparse.Namespace) -> int:
     print(f"  difficulty {s.difficulty:.2f} (conf {s.difficulty_confidence:.2f})  stakes {s.stakes:.2f}  reasoning {s.needs_reasoning:.2f}  domain {s.domain}  len {s.output_length:.1f}  trivial {s.trivial_ack:.2f}")
     print("  " + "  |  ".join(d.reason))
     est = "unknown" if d.est_cost_usd is None else f"${d.est_cost_usd:.5f}"
-    print(f"  jev {d.jev_latency_ms} ms, {d.jev_input_tokens} tokens (${d.jev_input_tokens * 0.042 / 1e6:.6f})   est call cost {est}{f'   logged → {router.log_path}' if router.log_path else ''}")
+    saving = ""
+    if d.est_cost_usd is not None and d.est_flagship_cost_usd:
+        saving = f" · {d.est_flagship_model} would cost ${d.est_flagship_cost_usd:.5f} → saves {_pct(1 - d.est_cost_usd / d.est_flagship_cost_usd)}"
+    print(f"  est cost {est}{saving}")
+    print(f"  jev {d.jev_latency_ms} ms, {d.jev_input_tokens} tokens (${d.jev_input_tokens * 0.042 / 1e6:.6f}){f'   logged → {router.log_path}' if router.log_path else ''}")
     return 0
 
 
@@ -80,8 +84,17 @@ def cmd_ask(args: argparse.Namespace) -> int:
     d = r.decision
     print(f"→ {r.model}{f'  (fell back from {d.model})' if r.fell_back else ''}   tier={d.tier}{f' (requested {d.requested_tier}, DEGRADED)' if d.degraded else ''}")
     print("  " + "  |  ".join(d.reason))
-    cost = "unknown" if r.cost_usd is None else f"${r.cost_usd:.6f}"
-    print(f"  jev {d.jev_latency_ms} ms · model {r.latency_ms} ms · {r.usage['input_tokens']} in / {r.usage['output_tokens']} out · cost {cost}")
+    total = r.total_cost_usd if r.total_cost_usd is not None else r.cost_usd
+    cost = "unknown" if total is None else f"${total:.6f}"
+    flag_meta = (router.config.get("models") or {}).get(d.est_flagship_model or "")
+    flag_actual = None
+    if flag_meta and "price" in flag_meta:
+        flag_actual = (r.usage["input_tokens"] * flag_meta["price"]["input"] + r.usage["output_tokens"] * flag_meta["price"]["output"]) / 1e6
+    saving = ""
+    if total is not None and flag_actual and r.model != d.est_flagship_model:
+        saving = f" · {d.est_flagship_model} would cost ${flag_actual:.6f} → saves {_pct(1 - total / flag_actual)}"
+    gate = f" · gate P(addresses) {r.gate.addresses:.2f}" if r.gate else ""
+    print(f"  jev {d.jev_latency_ms} ms · model {r.latency_ms} ms · {r.usage['input_tokens']} in / {r.usage['output_tokens']} out · cost {cost}{saving}{gate}")
     for a in r.attempts:
         if not a.ok:
             print(f"  ✗ {a.model}: {a.error}")
@@ -165,6 +178,46 @@ def cmd_tune(args: argparse.Namespace) -> int:
     return 0
 
 
+def _bar(v: float, mx: float = 1.0) -> str:
+    k = round((max(0.0, min(mx, v)) / mx) * 20)
+    return "█" * k + "░" * (20 - k)
+
+
+def cmd_explain(args: argparse.Namespace) -> int:
+    """Show the signals and reasons behind the last decision(s). Reads the log; needs no key."""
+    cfg = load_config(args.config)
+    path = args.log or (cfg.get("log") or {}).get("path") or DEFAULT_LOG
+    n = max(1, int(args.last or 1))
+    entries = read_log(path)[-n:]
+    if not entries:
+        print(f'no decisions in {path}. Route something first: tiershift route "hello"')
+        return 0
+    if args.json:
+        print(json.dumps(entries, indent=2, ensure_ascii=False))
+        return 0
+    for e in entries:
+        s = e["signals"]
+        cs = e.get("code_signals") or {}
+        tag = f"  tag={e['tag']}" if e.get("tag") else ""
+        print(f"\n{e['ts']}  {e['kind']}{tag}")
+        req = f" (requested {e['requested_tier']})" if e.get("requested_tier") != e.get("tier") else ""
+        print(f"→ {e['model']}   tier={e['tier']}{req}{'  fell back' if e.get('fell_back') else ''}{'  DEGRADED' if e.get('degraded') else ''}")
+        print(f"  difficulty      {_bar(s['difficulty'], 2)} {s['difficulty']:.2f} / 2   confidence {s['difficulty_confidence']:.2f}")
+        print(f"  stakes          {_bar(s['stakes'], 2)} {s['stakes']:.2f} / 2   confidence {s['stakes_confidence']:.2f}")
+        print(f"  output_length   {_bar(s['output_length'], 2)} {s['output_length']:.2f} / 2")
+        for k in ("needs_reasoning", "mid_tier_ok", "has_code", "ambiguous", "creative", "safety_sensitive", "trivial_ack"):
+            print(f"  {k:<16}{_bar(s[k])} {s[k]:.2f}")
+        tools = f"   tools {cs.get('tool_count')}" if cs.get("has_tools") else ""
+        retries = f"   retries {cs.get('retries')}" if cs.get("retries") else ""
+        print(f"  domain          {s['domain']} ({s['domain_confidence']:.2f})   tokens in ~{cs.get('est_input_tokens')}{tools}{retries}")
+        print("  why             " + "\n                  ".join(e.get("reason") or []))
+        cost = e.get("cost_usd") if e.get("cost_usd") is not None else e.get("est_cost_usd")
+        est_note = " (estimate)" if e.get("cost_usd") is None else ""
+        gate = f"   gate P(addresses) {e['gate_addresses']:.2f}" if e.get("gate_addresses") is not None else ""
+        print(f"  cost            {'unknown' if cost is None else f'${cost:.5f}{est_note}'}   jev {e['jev_latency_ms']} ms{gate}")
+    return 0
+
+
 def _common(sp: argparse.ArgumentParser) -> None:
     """--config and --json are accepted before or after the subcommand. SUPPRESS keeps a subparser from clobbering the parent value."""
     sp.add_argument("--config", default=argparse.SUPPRESS, help="path to tiershift.yaml (default: ./tiershift.yaml, then bundled)")
@@ -197,6 +250,11 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--log", help="decision log path")
     _common(t)
     t.set_defaults(fn=cmd_tune)
+    ex = sub.add_parser("explain", help="show the signals and reasons behind the last decision(s)")
+    ex.add_argument("--last", type=int, default=1, help="how many recent decisions to show")
+    ex.add_argument("--log", help="decision log path")
+    _common(ex)
+    ex.set_defaults(fn=cmd_explain)
     return p
 
 

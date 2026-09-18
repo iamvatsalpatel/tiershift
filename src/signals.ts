@@ -127,3 +127,20 @@ export async function askJev(client: JevClient, input: RouteInput, model?: strin
     input_tokens: res.usage.input_tokens,
   };
 }
+
+/** The answer gate. One narrow judgment: does the answer fully address the request? Yes/no criteria carry the definition. */
+export const GATE_QUESTIONS = {
+  addresses: noul(
+    { question: "Does `answer` fully and correctly address `request`?", yes_means: "Every part of the request is answered correctly, nothing is invented, and there is no filler.", no_means: "A part is missing or wrong, the answer invents context the request did not give, or it pads a trivial request with unnecessary text." },
+  ),
+} as const;
+
+export interface GateJudgment { addresses: number; latency_ms: number; input_tokens: number }
+
+/** Judge an answer against the last user message. Text only, trimmed; never the whole conversation. */
+export async function askGate(client: JevClient, messages: Message[], answer: string, model?: string, timeout?: number): Promise<GateJudgment> {
+  const request = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+  const t0 = performance.now();
+  const res = await client.systemOne({ state: { request: request.slice(0, MESSAGE_CHARS), answer: answer.slice(0, 8000) }, questions: GATE_QUESTIONS, model }, { timeout });
+  return { addresses: res.answers.addresses.noul, latency_ms: Math.round(performance.now() - t0), input_tokens: res.usage.input_tokens };
+}

@@ -26,21 +26,19 @@ rules:                                  # first match sets the base tier; defaul
 
 overrides:                              # all apply, in order
   - { when: needs_reasoning > 0.8 or difficulty >= 1.3, at_least: mid }
-  - { when: stakes > 1.5,                                at_least: flagship }
-  - { when: safety_sensitive > 0.7,                      at_least: flagship }
+  - { when: stakes > 1.5 or safety_sensitive > 0.7,     at_least: mid }
   - { when: has_tools and tier == local,                 at_least: fast }
   - { when: retries >= 1,                                up: 1 }
-  # optional: pure acknowledgements to a free local model
+  # opt in: the hardest high-stakes work to the flagship
+  # - { when: stakes > 1.5 and difficulty >= 1.3, at_least: flagship }
+  # opt in: pure acknowledgements to a free local model
   # - { when: trivial_ack > 0.8 and stakes < 0.5, at_most: local }
 
-budget:
-  max_cost_per_call: 0.10               # USD; skip models above this estimate
-  prefer: order                         # order | cheapest
+gate:                                   # opt in: judge fast-tier answers, retry one tier up below the threshold
+  enabled: false
+  threshold: 0.5
+  tiers: [fast]
 ```
-
-Signals you can use in conditions: `difficulty`, `stakes`, `output_length` (0 to 2), `needs_reasoning`, `has_code`, `ambiguous`, `creative`, `safety_sensitive`, `trivial_ack`, `mid_tier_ok` (0 to 1), `domain` (string), `difficulty_confidence`, `stakes_confidence`, `domain_confidence`, plus code signals `has_tools`, `tool_count`, `est_input_tokens`, `retries`, `step`, `turn_count`, and the current `tier`. Overrides take `at_least` (floor), `at_most` (ceiling), or `up` (move N tiers). A typo in any name fails at load time with a did-you-mean hint.
-
-The Jev model is pinned to `jev-1.13.0` in the YAML. Routing depends on the model, so upgrading is a deliberate edit, not a silent drift.
 
 ## Rule and override semantics
 
@@ -60,3 +58,7 @@ Models with the `reasoning` capability spend output tokens thinking before they 
 ## Pin the Jev model
 
 `jev.model` defaults to `jev-1.13.0`. Routing depends on the model, so a new Jev version changes decisions. Upgrade on purpose: set the new version, replay your log with `tiershift tune`, then ship.
+
+## Answer gate
+
+With `gate.enabled: true`, `complete()` sends each answer from a listed tier to Jev with one question: does the answer fully and correctly address the request? Below `threshold`, the answer is discarded, its cost is still billed, and the request retries on the fallback one tier up. The gate never runs on tool calls or on the last candidate. It adds 650 to 1000 ms per gated answer and about $0.00002. On the benchmark it raised quality by 0.03 for one point of saving. `CompleteResult.gate` carries the probability, and the log entry carries `gate_addresses`.

@@ -61,29 +61,35 @@ jev:
 # Code signals: has_tools, tool_count, est_input_tokens, retries, step, turn_count. Overrides also see `tier`.
 # A typo in a signal or tier name fails at load time with a did-you-mean hint.
 rules:
-  # Everything starts on the fast tier. A capable small model handles most prompts as well as a flagship does.
+  # Everything starts on the fast tier. On the benchmark a capable small model matched the flagship on 106 of 120 prompts.
   - default: fast
 
 # Overrides run after rules, in order. `at_least` raises to a floor. `at_most` lowers to a ceiling. `up` moves N tiers up.
-# Escalate only on evidence. In the benchmark the flagship was strictly best on 3 of 120 prompts, and the mid tier
-# beat it on hard prompts at a third of the cost. The flagship is reserved for high stakes and safety.
+# Escalate on evidence. The mid tier takes reasoning, hard, high-stakes, and safety-sensitive work: on the benchmark it
+# matched or beat the flagship on all of those at a third of the cost. The flagship is opt-in below.
 overrides:
   - when: needs_reasoning > 0.8 or difficulty >= 1.3   # proofs, debugging, planning, expert-level work
     at_least: mid
-  - when: stakes > 1.5                 # a wrong answer costs real money, legal exposure, or production impact
-    at_least: flagship
-  - when: safety_sensitive > 0.7       # medical, legal, financial, or physical-safety advice
-    at_least: flagship
+  - when: stakes > 1.5 or safety_sensitive > 0.7       # money, legal, production, medical, physical safety
+    at_least: mid
   - when: has_tools and tier == local
     at_least: fast
-  - when: retries >= 1                 # the previous attempt failed; move up one tier
+  - when: retries >= 1                                  # the previous attempt failed; move up one tier
     up: 1
-  # Optional: send pure acknowledgements to a free local model. Off by default: in the benchmark a 7B local model
-  # scored 4.2 on acknowledgements where the fast tier scored 4.7, for a saving of well under one cent per thousand.
+  # Flagship. Uncomment to send the hardest high-stakes work to the top tier. On the benchmark the flagship gave the
+  # single best answer on 3 of 120 prompts, so this costs saving without measured gain on plain prompts; agentic,
+  # tool-heavy work may differ. Test on your own log first: tiershift tune --candidate.
+  # - { when: stakes > 1.5 and difficulty >= 1.3, at_least: flagship }
+  # Local model for pure acknowledgements. Off by default: a 7B model scored 4.2 where the fast tier scored 4.7.
   # - { when: trivial_ack > 0.8 and stakes < 0.5, at_most: local }
-  # Conservative variant: every hard prompt to the flagship, and move up on low confidence.
-  # - { when: difficulty >= 1.3, at_least: flagship }
-  # - { when: difficulty_confidence < 0.5, up: 1 }
+
+# Answer gate (opt-in). After a fast-tier answer, one Jev call asks whether the answer fully addresses the request.
+# Below the threshold, complete() retries on the fallback tier. On the benchmark: +0.03 quality for -1 point of saving,
+# and 650 to 1000 ms per gated call. Turn it on when quality matters more than latency.
+gate:
+  enabled: false
+  threshold: 0.5               # retry when P(answer addresses the request) is below this
+  tiers: [fast]                # only gate answers from these tiers
 
 budget:
   max_cost_per_call: 0.10      # USD. Models above this estimate are skipped within a tier.

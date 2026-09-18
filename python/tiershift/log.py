@@ -51,7 +51,7 @@ def from_decision(d: Decision, kind: str, **extra: Any) -> dict[str, Any]:
         "code_signals": d.code_signals.to_dict(),
         "reason": list(d.reason),
         "est_cost_usd": d.est_cost_usd,
-        "cost_usd": None,
+        "cost_usd": None,  # everything billed for the request: failed attempts, gate calls, and the served answer
         "input_tokens": None,
         "output_tokens": None,
         "jev_latency_ms": d.jev_latency_ms,
@@ -59,7 +59,7 @@ def from_decision(d: Decision, kind: str, **extra: Any) -> dict[str, Any]:
         "model_latency_ms": None,
     }
     for k, v in extra.items():
-        if k == "tag" and v is None:
+        if k in ("tag", "gate_addresses") and v is None:
             continue
         entry[k] = v
     return entry

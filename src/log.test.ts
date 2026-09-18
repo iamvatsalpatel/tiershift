@@ -9,7 +9,7 @@ const decision: Decision = {
   model: "p/m", provider: "p", tier: "mid", tier_index: 2, requested_tier: "mid", degraded: false, fallback: "p/x", fallback_tier: "flagship",
   signals: { difficulty: 1, difficulty_confidence: 0.8, needs_reasoning: 0.5, stakes: 0.2, stakes_confidence: 0.9, domain: "code", domain_confidence: 0.9, has_code: 0.9, ambiguous: 0.1, output_length: 1, creative: 0, safety_sensitive: 0, trivial_ack: 0, mid_tier_ok: 0.5 },
   code_signals: { est_input_tokens: 120, has_tools: false, tool_count: 0, step: null, retries: 0, turn_count: 1 },
-  confidence: 0.8, reason: ['rule "difficulty < 1.3" → mid'], est_cost_usd: 0.004, est_output_tokens: 400, jev_latency_ms: 210, jev_input_tokens: 950,
+  confidence: 0.8, reason: ['rule "difficulty < 1.3" → mid'], est_cost_usd: 0.004, est_flagship_cost_usd: 0.04, est_flagship_model: "p/x", est_output_tokens: 400, jev_latency_ms: 210, jev_input_tokens: 950,
 };
 
 describe("decision log", () => {

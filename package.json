@@ -1,6 +1,6 @@
 {
   "name": "tiershift",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Shift every LLM call to the cheapest model that can handle it. Routing decided by TypeSafe Jev in ~280 ms.",
   "type": "module",
   "license": "MIT",

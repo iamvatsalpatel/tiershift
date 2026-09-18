@@ -6,8 +6,8 @@ from .log import DEFAULT_LOG, from_decision, log_entry, read_log
 from .policy import PolicyResult, apply_policy, edit_distance, estimate_output_tokens, eval_condition, parse_condition, suggest
 from .providers import AnthropicProvider, OpenAICompatibleProvider, Provider, ProviderError, build_providers
 from .router import Router, create_router
-from .signals import QUESTIONS, ask_jev, ask_jev_async, build_state, code_signals, estimate_tokens
-from .types import DEFAULT_JEV_MODEL, KNOWN_SIGNALS, Attempt, CodeSignals, CompleteResult, Config, Decision, Message, ModelMeta, Signals, ToolCall, ToolDef
+from .signals import GATE_QUESTIONS, QUESTIONS, ask_gate, ask_jev, ask_jev_async, build_state, code_signals, estimate_tokens
+from .types import DEFAULT_JEV_MODEL, KNOWN_SIGNALS, Attempt, CodeSignals, CompleteResult, Config, Decision, GateResult, Message, ModelMeta, Signals, ToolCall, ToolDef
 
 __version__ = "0.1.0"
 __all__ = [
@@ -19,4 +19,5 @@ __all__ = [
     "log_entry", "read_log", "from_decision", "DEFAULT_LOG",
     "build_report", "tune", "entry_cost", "est_cost_for", "model_for_tier", "Report", "TuneResult",
     "AnthropicProvider", "OpenAICompatibleProvider", "Provider", "ProviderError", "build_providers",
+    "GATE_QUESTIONS", "ask_gate", "GateResult",
 ]

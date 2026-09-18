@@ -149,3 +149,30 @@ async def ask_jev_async(client: AsyncTypeSafeClient, state: dict[str, Any], mode
     t0 = time.perf_counter()
     res = await client.system_one(state=state, questions=QUESTIONS, model=model, timeout=timeout)
     return JevResult(signals=_to_signals(res.answers), latency_ms=round((time.perf_counter() - t0) * 1000), input_tokens=res.usage.input_tokens or 0)
+
+
+# The answer gate. One narrow judgment: does the answer fully address the request? Yes/no criteria carry the definition.
+GATE_QUESTIONS: dict[str, Any] = {
+    "addresses": Noul(
+        instructions={
+            "question": "Does `answer` fully and correctly address `request`?",
+            "yes_means": "Every part of the request is answered correctly, nothing is invented, and there is no filler.",
+            "no_means": "A part is missing or wrong, the answer invents context the request did not give, or it pads a trivial request with unnecessary text.",
+        },
+    ),
+}
+
+
+@dataclass
+class GateJudgment:
+    addresses: float
+    latency_ms: int
+    input_tokens: int
+
+
+def ask_gate(client: TypeSafeClient, messages: Sequence[Message], answer: str, model: Optional[str] = None, timeout: Optional[float] = None) -> GateJudgment:
+    """Judge an answer against the last user message. Text only, trimmed; never the whole conversation."""
+    request = _last(messages, "user")
+    t0 = time.perf_counter()
+    res = client.system_one(state={"request": request[:MESSAGE_CHARS], "answer": answer[:8000]}, questions=GATE_QUESTIONS, model=model, timeout=timeout)
+    return GateJudgment(addresses=res.answers["addresses"].noul, latency_ms=round((time.perf_counter() - t0) * 1000), input_tokens=res.usage.input_tokens or 0)

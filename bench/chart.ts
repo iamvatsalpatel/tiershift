@@ -33,7 +33,7 @@ export function renderChart(t: Theme): string {
   let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="t d" font-family='${FONT}'>\n`;
   s += `<title id="t">Quality against cost, three arms</title>\n<desc id="d">${esc(ARMS.map((a) => `${LABEL[a]}: quality ${S[a].quality.toFixed(2)}, ${fmtCost(S[a].per1k)} per 1,000 prompts`).join(". "))}.</desc>\n`;
   s += `<rect width="${W}" height="${H}" fill="${t.surface}"/>\n`;
-  s += `<text x="${m.left}" y="34" fill="${t.text}" font-size="17" font-weight="600">The fast model matched the flagship. tiershift is the safety net.</text>\n`;
+  s += `<text x="${m.left}" y="34" fill="${t.text}" font-size="17" font-weight="600">Same quality as the flagship at 60% of the cost.</text>\n`;
   s += `<text x="${m.left}" y="56" fill="${t.text2}" font-size="12.5">${meta.prompts} prompts · mean quality 1 to 5, judged blind by ${esc(meta.judge.split("/")[1])} · cost per 1,000 prompts, log scale · ${meta.date}</text>\n`;
 
   // gridlines and axes: hairline, solid, recessive
@@ -61,9 +61,9 @@ export function renderChart(t: Theme): string {
   const placed: Placed[] = byCost.map((p, i) => {
     if (i === 0) return { ...p, lx: p.cx + 14, ly: p.cy, anchor: "start", leader: false };
     if (i === byCost.length - 1) return { ...p, lx: p.cx + 14, ly: p.cy, anchor: "start", leader: false };
-    // middle points: stack below the plot's crowded corner, alternating rows
+    // middle points: one label below, one further below and pushed left, so neither text crosses the other
     const row = i; // 1 or 2
-    return { ...p, lx: p.cx - 40 * (row - 1), ly: p.cy + LABEL_H * row + 6, anchor: "middle", leader: true };
+    return { ...p, lx: p.cx - 120 * (row - 1), ly: p.cy + LABEL_H * row + 10, anchor: row === 1 ? "middle" : "end", leader: true };
   });
   // If a right-side label would run past the canvas, flip it to the left.
   for (const l of placed) if (l.anchor === "start" && l.lx + 175 > W - 12) { l.lx = l.cx - 14; l.anchor = "end"; }

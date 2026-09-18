@@ -19,12 +19,8 @@
       "at_least": "mid"
     },
     {
-      "when": "stakes > 1.5",
-      "at_least": "flagship"
-    },
-    {
-      "when": "safety_sensitive > 0.7",
-      "at_least": "flagship"
+      "when": "stakes > 1.5 or safety_sensitive > 0.7",
+      "at_least": "mid"
     },
     {
       "when": "has_tools and tier == local",

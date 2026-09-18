@@ -27,7 +27,8 @@ function printHelp() {
   tiershift check [--config tiershift.yaml]                      show which configured models have keys
   tiershift sync-models [--write]                                pull prices and limits from models.dev into prices.yaml
   tiershift report [--log path] [--json]                         tier mix, spend, and saving vs always-flagship from the decision log
-  tiershift tune --candidate other.yaml [--log path]             replay logged decisions against another policy; no API calls`);
+  tiershift tune --candidate other.yaml [--log path]             replay logged decisions against another policy; no API calls
+  tiershift explain [--last N] [--log path] [--json]              show the signals and reasons behind the last decision(s)`);
 }
 
 async function main() {
@@ -111,7 +112,31 @@ async function main() {
     return;
   }
 
-  const KNOWN = new Set(["serve", "check", "route", "ask"]);
+  if (cmd === "explain") {
+    const cfg = loadConfig(cfgPath);
+    const path = logPathArg ?? cfg.log?.path ?? DEFAULT_LOG;
+    const nIdx = args.indexOf("--last"); const n = nIdx >= 0 ? Number(args.splice(nIdx, 2)[1]) : 1;
+    const entries = readLog(path).slice(-Math.max(1, n));
+    if (entries.length === 0) { console.log(`no decisions in ${path}. Route something first: tiershift route "hello"`); return; }
+    if (json) { console.log(JSON.stringify(entries, null, 2)); return; }
+    const bar = (v: number, max = 1) => { const k = Math.round((Math.max(0, Math.min(max, v)) / max) * 20); return "█".repeat(k) + "░".repeat(20 - k); };
+    for (const e of entries) {
+      const s = e.signals;
+      console.log(`\n${e.ts}  ${e.kind}${e.tag ? `  tag=${e.tag}` : ""}`);
+      console.log(`→ ${e.model}   tier=${e.tier}${e.requested_tier !== e.tier ? ` (requested ${e.requested_tier})` : ""}${e.fell_back ? "  fell back" : ""}${e.degraded ? "  DEGRADED" : ""}`);
+      console.log(`  difficulty      ${bar(s.difficulty, 2)} ${s.difficulty.toFixed(2)} / 2   confidence ${s.difficulty_confidence.toFixed(2)}`);
+      console.log(`  stakes          ${bar(s.stakes, 2)} ${s.stakes.toFixed(2)} / 2   confidence ${s.stakes_confidence.toFixed(2)}`);
+      console.log(`  output_length   ${bar(s.output_length, 2)} ${s.output_length.toFixed(2)} / 2`);
+      for (const k of ["needs_reasoning", "mid_tier_ok", "has_code", "ambiguous", "creative", "safety_sensitive", "trivial_ack"] as const) console.log(`  ${k.padEnd(16)}${bar(s[k])} ${s[k].toFixed(2)}`);
+      console.log(`  domain          ${s.domain} (${s.domain_confidence.toFixed(2)})   tokens in ~${e.code_signals.est_input_tokens}${e.code_signals.has_tools ? `   tools ${e.code_signals.tool_count}` : ""}${e.code_signals.retries ? `   retries ${e.code_signals.retries}` : ""}`);
+      console.log(`  why             ${e.reason.join("\n                  ")}`);
+      const cost = e.cost_usd ?? e.est_cost_usd;
+      console.log(`  cost            ${cost === null ? "unknown" : `$${cost.toFixed(5)}${e.cost_usd === null ? " (estimate)" : ""}`}   jev ${e.jev_latency_ms} ms`);
+    }
+    return;
+  }
+
+  const KNOWN = new Set(["serve", "check", "route", "ask", "explain"]);
   if (!cmd || !KNOWN.has(cmd)) {
     if (cmd && cmd !== "help" && cmd !== "--help" && cmd !== "-h") console.error(`unknown command "${cmd}"\n`);
     printHelp();
@@ -151,7 +176,9 @@ async function main() {
     console.log(`→ ${d.model}   tier=${d.tier}${d.degraded ? ` (requested ${d.requested_tier}, DEGRADED)` : ""}   fallback=${d.fallback ?? "none"}`);
     console.log(`  difficulty ${s.difficulty.toFixed(2)} (conf ${s.difficulty_confidence.toFixed(2)})  stakes ${s.stakes.toFixed(2)}  reasoning ${s.needs_reasoning.toFixed(2)}  domain ${s.domain}  len ${s.output_length.toFixed(1)}  trivial ${s.trivial_ack.toFixed(2)}`);
     console.log(`  ${d.reason.join("  |  ")}`);
-    console.log(`  jev ${d.jev_latency_ms} ms, ${d.jev_input_tokens} tokens ($${(d.jev_input_tokens * 0.042 / 1e6).toFixed(6)})   est call cost ${d.est_cost_usd === null ? "unknown" : "$" + d.est_cost_usd.toFixed(5)}${router.logPath ? `   logged → ${router.logPath}` : ""}`);
+    const saving = d.est_cost_usd !== null && d.est_flagship_cost_usd ? ` · ${d.est_flagship_model} would cost $${d.est_flagship_cost_usd.toFixed(5)} → saves ${pctf(1 - d.est_cost_usd / d.est_flagship_cost_usd)}` : "";
+    console.log(`  est cost ${d.est_cost_usd === null ? "unknown" : "$" + d.est_cost_usd.toFixed(5)}${saving}`);
+    console.log(`  jev ${d.jev_latency_ms} ms, ${d.jev_input_tokens} tokens ($${(d.jev_input_tokens * 0.042 / 1e6).toFixed(6)})${router.logPath ? `   logged → ${router.logPath}` : ""}`);
     return;
   }
 
@@ -163,7 +190,9 @@ async function main() {
     const d = r.decision;
     console.log(`→ ${r.model}${r.fell_back ? `  (fell back from ${d.model})` : ""}   tier=${d.tier}${d.degraded ? ` (requested ${d.requested_tier}, DEGRADED)` : ""}`);
     console.log(`  ${d.reason.join("  |  ")}`);
-    console.log(`  jev ${d.jev_latency_ms} ms · model ${r.latency_ms} ms · ${r.usage.input_tokens} in / ${r.usage.output_tokens} out · cost ${r.cost_usd === null ? "unknown" : "$" + r.cost_usd.toFixed(6)}`);
+    const flagMeta = d.est_flagship_model ? router.config.models?.[d.est_flagship_model] : undefined;
+    const flagActual = flagMeta?.price ? (r.usage.input_tokens * flagMeta.price.input + r.usage.output_tokens * flagMeta.price.output) / 1e6 : null;
+    console.log(`  jev ${d.jev_latency_ms} ms · model ${r.latency_ms} ms · ${r.usage.input_tokens} in / ${r.usage.output_tokens} out · cost ${r.cost_usd === null ? "unknown" : "$" + r.cost_usd.toFixed(6)}${r.cost_usd !== null && flagActual && r.model !== d.est_flagship_model ? ` · ${d.est_flagship_model} would cost $${flagActual.toFixed(6)} → saves ${pctf(1 - r.cost_usd / flagActual)}` : ""}`);
     if (r.attempts.some((a) => !a.ok)) for (const a of r.attempts.filter((a) => !a.ok)) console.log(`  ✗ ${a.model}: ${a.error}`);
     console.log(`\n${r.text.trim()}`);
     return;

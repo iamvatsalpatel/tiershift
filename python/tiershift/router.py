@@ -12,8 +12,10 @@ from .config import has_key, load_config, split_model
 from .log import DEFAULT_LOG, from_decision, log_entry
 from .policy import apply_policy, estimate_output_tokens
 from .providers import CompletionRequest, Provider, ProviderError, build_providers
-from .signals import ask_jev, build_state, code_signals
-from .types import DEFAULT_JEV_MODEL, Attempt, CompleteResult, Config, Decision, Message, ModelMeta, ToolDef
+from .signals import ask_gate, ask_jev, build_state, code_signals
+from .types import DEFAULT_JEV_MODEL, Attempt, CompleteResult, Config, Decision, GateResult, Message, ModelMeta, ToolDef
+
+JEV_PRICE_PER_TOKEN = 0.042 / 1e6
 
 Pick = tuple[str, Optional[float]]
 
@@ -139,18 +141,26 @@ class Router:
             raise RuntimeError(f"No model fits. Check provider keys and budget. Reasons: {'; '.join(reason)}")
 
         fallback: Optional[str] = None
+        fallback_tier: Optional[str] = None
         if cfg.get("fallback", "up") != "none":
             for fi in range(ti + 1, len(order)):
                 fb = _pick_in_tier(cfg, order[fi], code.est_input_tokens, out_tok, code.has_tools, None, self.env, [])
                 if fb is not None:
                     fallback = fb[0]
+                    fallback_tier = order[fi]
                     break
+
+        # Reference: the same request on the top tier's first usable model. Code arithmetic, never Jev.
+        top_models = cfg["tiers"].get(order[-1], [])
+        top_model = next((m for m in top_models if has_key(cfg, split_model(m)[0], self.env)), top_models[0] if top_models else None)
+        flagship_cost = _est_cost((cfg.get("models") or {}).get(top_model), code.est_input_tokens, out_tok) if top_model else None
 
         deciding_conf = min(jev.signals.difficulty_confidence, jev.signals.stakes_confidence)
         decision = Decision(
             model=pick[0], provider=split_model(pick[0])[0], tier=order[ti], tier_index=ti, requested_tier=policy.tier, degraded=degraded,
-            fallback=fallback, signals=jev.signals, code_signals=code, confidence=round(deciding_conf, 3), reason=reason,
-            est_cost_usd=pick[1], est_output_tokens=out_tok, jev_latency_ms=jev.latency_ms, jev_input_tokens=jev.input_tokens,
+            fallback=fallback, fallback_tier=fallback_tier, signals=jev.signals, code_signals=code, confidence=round(deciding_conf, 3), reason=reason,
+            est_cost_usd=pick[1], est_flagship_cost_usd=flagship_cost, est_flagship_model=top_model, est_output_tokens=out_tok,
+            jev_latency_ms=jev.latency_ms, jev_input_tokens=jev.input_tokens,
         )
         if not _no_log:
             self._write(from_decision(decision, "route", tag=tag))
@@ -172,6 +182,11 @@ class Router:
         defaults = cfg.get("defaults") or {}
         models = cfg.get("models") or {}
         min_out = defaults.get("min_output_tokens", 1024)
+        gate_cfg = cfg.get("gate") or {}
+        gate_on = gate_cfg.get("enabled") is True
+        gate_tiers = set(gate_cfg.get("tiers") or ["fast"])
+        gate_threshold = float(gate_cfg.get("threshold", 0.5))
+        billed = 0.0  # failed attempts and gate calls, added to the served answer's cost
         for mid in candidates:
             pname, model = split_model(mid)
             provider = self.providers.get(pname)
@@ -191,6 +206,7 @@ class Router:
                     params=(models.get(mid) or {}).get("params"),
                 ))
                 if not r.text.strip() and not r.tool_calls and r.finish_reason == "length":
+                    billed += _est_cost(models.get(mid), r.input_tokens, r.output_tokens) or 0.0
                     raise ProviderError(pname, None, f"empty_answer:length (output budget {mt} consumed before any answer text; {r.output_tokens} output tokens billed)")
             except ProviderError as e:
                 attempts.append(Attempt(model=mid, ok=False, latency_ms=round((time.perf_counter() - t0) * 1000), error=self._redact(str(e)), status=e.status))
@@ -200,15 +216,33 @@ class Router:
             except Exception as e:  # network or unexpected: try the fallback
                 attempts.append(Attempt(model=mid, ok=False, latency_ms=round((time.perf_counter() - t0) * 1000), error=self._redact(str(e))))
                 continue
-            attempts.append(Attempt(model=mid, ok=True, latency_ms=r.latency_ms))
             cost = _est_cost(models.get(mid), r.input_tokens, r.output_tokens)
             fell_back = mid != decision.model
-            self._write(from_decision(decision, "complete", model=mid, tier=self._tier_of(mid), fell_back=fell_back, cost_usd=cost,
-                                      input_tokens=r.input_tokens, output_tokens=r.output_tokens, model_latency_ms=r.latency_ms, tag=tag))
+            # The same model may sit in several tiers. Log the tier the decision chose, not the first tier that lists the model.
+            tier_of_id = decision.tier if not fell_back else (decision.fallback_tier or decision.tier)
+            gate: Optional[GateResult] = None
+            has_next = candidates.index(mid) < len(candidates) - 1
+            if gate_on and tier_of_id in gate_tiers and has_next and not r.tool_calls:
+                g = ask_gate(self._jev, messages, r.text, self._jev_model, self._jev_timeout)
+                billed += g.input_tokens * JEV_PRICE_PER_TOKEN
+                gate = GateResult(addresses=g.addresses, threshold=gate_threshold, passed=g.addresses >= gate_threshold, latency_ms=g.latency_ms, jev_input_tokens=g.input_tokens)
+                if not gate.passed:
+                    billed += cost or 0.0
+                    nxt = candidates[candidates.index(mid) + 1]
+                    decision.reason.append(f"gate: P(addresses)={g.addresses:.2f} < {gate_threshold:g} on {mid} → retry on {nxt}")
+                    attempts.append(Attempt(model=mid, ok=False, latency_ms=r.latency_ms + g.latency_ms, error=f"gate:addresses {g.addresses:.2f} < {gate_threshold:g}"))
+                    continue
+            attempts.append(Attempt(model=mid, ok=True, latency_ms=r.latency_ms))
+            total = None if cost is None else cost + billed
+            extra: dict[str, Any] = {}
+            if gate is not None:
+                extra["gate_addresses"] = gate.addresses
+            self._write(from_decision(decision, "complete", model=mid, tier=tier_of_id, fell_back=fell_back, cost_usd=total,
+                                      input_tokens=r.input_tokens, output_tokens=r.output_tokens, model_latency_ms=r.latency_ms, tag=tag, **extra))
             return CompleteResult(
                 decision=decision, model=mid, served_model=r.served_model, fell_back=fell_back, attempts=attempts, text=r.text,
                 tool_calls=r.tool_calls, finish_reason=r.finish_reason, usage={"input_tokens": r.input_tokens, "output_tokens": r.output_tokens},
-                cost_usd=cost, latency_ms=r.latency_ms, raw=r.raw,
+                cost_usd=cost, total_cost_usd=total, gate=gate, latency_ms=r.latency_ms + (gate.latency_ms if gate else 0), raw=r.raw,
             )
         raise RuntimeError(self._redact("tiershift: every candidate failed. " + " | ".join(f"{a.model}: {a.error}" for a in attempts)))
 

@@ -84,6 +84,11 @@ export function validate(cfg: Config): void {
   if (cfg.budget?.prefer !== undefined && cfg.budget.prefer !== "order" && cfg.budget.prefer !== "cheapest") fail("budget.prefer", `must be "order" or "cheapest"`);
   if (cfg.fallback !== undefined && cfg.fallback !== "up" && cfg.fallback !== "none") fail("fallback", `must be "up" or "none"`);
   if (cfg.defaults?.min_output_tokens !== undefined && (!Number.isInteger(cfg.defaults.min_output_tokens) || cfg.defaults.min_output_tokens < 0)) fail("defaults.min_output_tokens", `must be a non-negative integer`);
+  if (cfg.gate) {
+    const th = cfg.gate.threshold;
+    if (th !== undefined && (typeof th !== "number" || th < 0 || th > 1)) throw new Error(`config: gate.threshold: must be a number from 0 to 1, got ${JSON.stringify(th)}`);
+    for (const tier of cfg.gate.tiers ?? []) if (!(tier in cfg.tiers)) throw new Error(`config: gate.tiers: unknown tier "${tier}". Tiers: ${Object.keys(cfg.tiers).join(", ")}`);
+  }
 }
 
 /** Split "provider/model-id" into parts. The model id may contain slashes or colons. */

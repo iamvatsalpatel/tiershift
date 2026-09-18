@@ -19,7 +19,7 @@ CFG = {
 
 
 def decision(**over) -> Decision:
-    base = dict(model="p/m", provider="p", tier="mid", tier_index=2, requested_tier="mid", degraded=False, fallback="p/x", signals=Signals(**SIG), code_signals=CodeSignals(**CODE),
+    base = dict(model="p/m", provider="p", tier="mid", tier_index=2, requested_tier="mid", degraded=False, fallback="p/x", fallback_tier="flagship", est_flagship_cost_usd=0.04, est_flagship_model="p/x", signals=Signals(**SIG), code_signals=CodeSignals(**CODE),
                 confidence=0.8, reason=['rule "difficulty < 1.3" → mid'], est_cost_usd=0.004, est_output_tokens=400, jev_latency_ms=210, jev_input_tokens=950)
     base.update(over)
     return Decision(**base)

@@ -130,6 +130,14 @@ def validate(cfg: Any) -> None:
     mot = (cfg.get("defaults") or {}).get("min_output_tokens")
     if mot is not None and (not _is_int(mot) or mot < 0):
         _fail("defaults.min_output_tokens", "must be a non-negative integer")
+    gate = cfg.get("gate")
+    if gate:
+        th = gate.get("threshold")
+        if th is not None and (isinstance(th, bool) or not isinstance(th, (int, float)) or th < 0 or th > 1):
+            raise ValueError(f"config: gate.threshold: must be a number from 0 to 1, got {json.dumps(th)}")
+        for tier in gate.get("tiers") or []:
+            if tier not in cfg["tiers"]:
+                raise ValueError(f'config: gate.tiers: unknown tier "{tier}". Tiers: {", ".join(tier_names)}')
 
 
 def split_model(model_id: str) -> tuple[str, str]:
